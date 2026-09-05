@@ -27,21 +27,6 @@ export interface ExtractedLabRecord {
   auditNotes?: string;
 }
 
-export interface FictionalDemoPatient {
-  id: string;
-  name: string;
-  age: number;
-  sex: string;
-  reports: {
-    id: string;
-    title: string;
-    date: string;
-    lab: string;
-    pageCount: number;
-  }[];
-  records: ExtractedLabRecord[];
-}
-
 /**
  * Deterministic reference range calculator.
  * Strictly adheres to rule:
@@ -70,185 +55,7 @@ export function calculateReferenceRangeStatus(
   return 'NORMAL';
 }
 
-/**
- * Fictional Demo Patient with 2 medical reports and required medical test variations:
- * 1. Normal result (e.g. Hemoglobin 14.2 g/dL with 13.0–17.0)
- * 2. Low result (e.g. Vitamin D 22 ng/mL with 30–100)
- * 3. High result (e.g. Fasting Glucose 114 mg/dL with 70–99)
- * 4. Missing reference range (e.g. hs-CRP 2.3 mg/L with REFERENCE RANGE UNAVAILABLE)
- * 5. Low-confidence result (e.g. Creatinine 1.1 mg/dL, confidence 0.64 due to fax toner smudge)
- */
-export const FICTIONAL_DEMO_PATIENT: FictionalDemoPatient = {
-  id: 'pt-demo-fictional-8821',
-  name: 'Eleanor Vance (Fictional Patient)',
-  age: 52,
-  sex: 'Female',
-  reports: [
-    {
-      id: 'rep-quest-2025-02',
-      title: 'Quest Diagnostics Comprehensive Metabolic & CBC Panel',
-      date: 'Feb 14, 2025',
-      lab: 'Quest Diagnostics Regional Lab (Clifton, NJ)',
-      pageCount: 2,
-    },
-    {
-      id: 'rep-labcorp-2024-01',
-      title: 'Labcorp Outpatient Lipid & Micronutrient Assay',
-      date: 'Jan 18, 2024',
-      lab: 'Labcorp Burlington Center (Burlington, NC)',
-      pageCount: 1,
-    },
-  ],
-  records: [
-    // 1. High result (Fasting Glucose)
-    {
-      id: 'rec-1',
-      testName: 'Fasting Blood Glucose',
-      value: '114',
-      numericValue: 114,
-      unit: 'mg/dL',
-      referenceRangeText: '70 - 99',
-      rangeLower: 70,
-      rangeUpper: 99,
-      hasReferenceRange: true,
-      status: 'HIGH',
-      date: 'Feb 14, 2025',
-      observation: 'Consistent upward trajectory over consecutive tests; warrants follow-up clinical discussion',
-      sourceDocument: 'Quest_Diagnostics_CMP_CBC_Feb2025.pdf',
-      pageNumber: 1,
-      confidence: 0.98,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '114',
-      originalAiUnit: 'mg/dL',
-      originalAiRange: '70 - 99',
-    },
-    // 2. Normal result (Hemoglobin)
-    {
-      id: 'rec-2',
-      testName: 'Hemoglobin (CBC)',
-      value: '14.2',
-      numericValue: 14.2,
-      unit: 'g/dL',
-      referenceRangeText: '13.0 - 17.0',
-      rangeLower: 13.0,
-      rangeUpper: 17.0,
-      hasReferenceRange: true,
-      status: 'NORMAL',
-      date: 'Feb 14, 2025',
-      observation: 'Within biological homeostatic bounds for adult female baseline',
-      sourceDocument: 'Quest_Diagnostics_CMP_CBC_Feb2025.pdf',
-      pageNumber: 1,
-      confidence: 0.99,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '14.2',
-      originalAiUnit: 'g/dL',
-      originalAiRange: '13.0 - 17.0',
-    },
-    // 3. Low result (Vitamin D, 25-Hydroxy)
-    {
-      id: 'rec-3',
-      testName: 'Vitamin D, 25-Hydroxy',
-      value: '22',
-      numericValue: 22,
-      unit: 'ng/mL',
-      referenceRangeText: '30 - 100',
-      rangeLower: 30,
-      rangeUpper: 100,
-      hasReferenceRange: true,
-      status: 'LOW',
-      date: 'Jan 18, 2024',
-      observation: 'Sub-optimal serum level; common in winter months',
-      sourceDocument: 'Labcorp_Lipid_Micronutrient_Jan2024.pdf',
-      pageNumber: 1,
-      confidence: 0.95,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '22',
-      originalAiUnit: 'ng/mL',
-      originalAiRange: '30 - 100',
-    },
-    // 4. Missing reference range (hs-CRP - High-Sensitivity C-Reactive Protein)
-    {
-      id: 'rec-4',
-      testName: 'hs-CRP (High-Sensitivity C-Reactive Protein)',
-      value: '2.3',
-      numericValue: 2.3,
-      unit: 'mg/L',
-      referenceRangeText: 'REFERENCE RANGE UNAVAILABLE',
-      rangeLower: null,
-      rangeUpper: null,
-      hasReferenceRange: false,
-      status: 'REFERENCE RANGE UNAVAILABLE',
-      date: 'Feb 14, 2025',
-      observation: 'Testing facility omitted reference bounds on outpatient fax sheet; MedLens will not guess intervals',
-      sourceDocument: 'Quest_Diagnostics_CMP_CBC_Feb2025.pdf',
-      pageNumber: 2,
-      confidence: 0.92,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '2.3',
-      originalAiUnit: 'mg/L',
-      originalAiRange: 'REFERENCE RANGE UNAVAILABLE',
-    },
-    // 5. Low-confidence result (Creatinine with fax toner smudge)
-    {
-      id: 'rec-5',
-      testName: 'Serum Creatinine',
-      value: '1.1',
-      numericValue: 1.1,
-      unit: 'mg/dL',
-      referenceRangeText: '0.6 - 1.3',
-      rangeLower: 0.6,
-      rangeUpper: 1.3,
-      hasReferenceRange: true,
-      status: 'NORMAL',
-      date: 'Feb 14, 2025',
-      observation: 'Toner horizontal streak detected across decimal point; flagged for clinician confirmation',
-      sourceDocument: 'Quest_Diagnostics_CMP_CBC_Feb2025.pdf',
-      pageNumber: 2,
-      confidence: 0.64,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '1.1',
-      originalAiUnit: 'mg/dL',
-      originalAiRange: '0.6 - 1.3',
-    },
-    // 6. Normal result across time (Total Cholesterol)
-    {
-      id: 'rec-6',
-      testName: 'Total Cholesterol',
-      value: '185',
-      numericValue: 185,
-      unit: 'mg/dL',
-      referenceRangeText: '125 - 200',
-      rangeLower: 125,
-      rangeUpper: 200,
-      hasReferenceRange: true,
-      status: 'NORMAL',
-      date: 'Jan 18, 2024',
-      observation: 'Desirable cardiovascular risk profile lipid marker',
-      sourceDocument: 'Labcorp_Lipid_Micronutrient_Jan2024.pdf',
-      pageNumber: 1,
-      confidence: 0.97,
-      isAiExtracted: true,
-      isHumanVerified: true,
-      isDemoFallback: true,
-      originalAiValue: '185',
-      originalAiUnit: 'mg/dL',
-      originalAiRange: '125 - 200',
-      verifiedBy: 'Dr. Sarah Lin, MD (Clinician Reviewer)',
-      verifiedAt: '2025-02-15T10:30:00Z',
-      auditNotes: 'Confirmed against printed Labcorp summary.',
-    },
-  ],
-};
+
 
 /**
  * Parses user-uploaded documents.
@@ -375,138 +182,76 @@ Return ONLY a JSON array with objects matching:
         }
       }
     } catch (err) {
-      console.warn('Gemini extraction failed or was offline, falling back to reliable fictional demo data', err);
+      console.warn('Gemini extraction failed or was offline', err);
     }
   }
 
-  // Reliable Fictional DEMO DATA fallback (works 100% offline, zero external APIs required)
-  // Generates realistic structured extractions mapped to the uploaded document name
-  const simulatedDelay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  await simulatedDelay(600);
+  // Client-Side Factual Extraction: Attempt to read readable text from the file (Text, CSV, Markdown, structured reports)
+  const extractedRecords: ExtractedLabRecord[] = [];
+  try {
+    const rawText = await readFileAsText(file);
+    if (rawText && rawText.trim().length > 0) {
+      const lines = rawText.split(/\r?\n/);
+      const labPattern = /([A-Za-z0-9\s,\-\(\)\/]{3,40}?)(?::|\t|\s{2,}|,)\s*([<>]?\s*\d+(?:\.\d+)?)\s*([a-zA-Z\/%μµ]+)?(?:\s+(?:Ref(?:erence)?(?:\s+Range)?:?\s*)?(\d+(?:\.\d+)?)\s*[-–—to]+\s*(\d+(?:\.\d+)?))?/i;
 
-  const fallbackRecords: ExtractedLabRecord[] = [
-    {
-      id: `ext-${Date.now()}-1`,
-      testName: 'Fasting Blood Glucose',
-      value: '114',
-      numericValue: 114,
-      unit: 'mg/dL',
-      referenceRangeText: '70 - 99',
-      rangeLower: 70,
-      rangeUpper: 99,
-      hasReferenceRange: true,
-      status: 'HIGH',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      observation: 'Impaired fasting glucose threshold observed; recommend lifestyle discussion',
-      sourceDocument: file.name,
-      pageNumber: 1,
-      confidence: 0.96,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '114',
-      originalAiUnit: 'mg/dL',
-      originalAiRange: '70 - 99',
-    },
-    {
-      id: `ext-${Date.now()}-2`,
-      testName: 'Hemoglobin (CBC)',
-      value: '14.2',
-      numericValue: 14.2,
-      unit: 'g/dL',
-      referenceRangeText: '13.0 - 17.0',
-      rangeLower: 13.0,
-      rangeUpper: 17.0,
-      hasReferenceRange: true,
-      status: 'NORMAL',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      observation: 'Red blood cell oxygen carrier capacity within expected limits',
-      sourceDocument: file.name,
-      pageNumber: 1,
-      confidence: 0.98,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '14.2',
-      originalAiUnit: 'g/dL',
-      originalAiRange: '13.0 - 17.0',
-    },
-    {
-      id: `ext-${Date.now()}-3`,
-      testName: 'Vitamin D, 25-Hydroxy',
-      value: '22',
-      numericValue: 22,
-      unit: 'ng/mL',
-      referenceRangeText: '30 - 100',
-      rangeLower: 30,
-      rangeUpper: 100,
-      hasReferenceRange: true,
-      status: 'LOW',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      observation: 'Serum 25(OH)D below 30 ng/mL laboratory benchmark',
-      sourceDocument: file.name,
-      pageNumber: 1,
-      confidence: 0.94,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '22',
-      originalAiUnit: 'ng/mL',
-      originalAiRange: '30 - 100',
-    },
-    {
-      id: `ext-${Date.now()}-4`,
-      testName: 'hs-CRP (Cardiovascular Risk Marker)',
-      value: '2.3',
-      numericValue: 2.3,
-      unit: 'mg/L',
-      referenceRangeText: 'REFERENCE RANGE UNAVAILABLE',
-      rangeLower: null,
-      rangeUpper: null,
-      hasReferenceRange: false,
-      status: 'REFERENCE RANGE UNAVAILABLE',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      observation: 'Testing lab omitted reference interval; MedLens refrains from guessing ranges',
-      sourceDocument: file.name,
-      pageNumber: 2,
-      confidence: 0.91,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '2.3',
-      originalAiUnit: 'mg/L',
-      originalAiRange: 'REFERENCE RANGE UNAVAILABLE',
-    },
-    {
-      id: `ext-${Date.now()}-5`,
-      testName: 'Serum Creatinine',
-      value: '1.1',
-      numericValue: 1.1,
-      unit: 'mg/dL',
-      referenceRangeText: '0.6 - 1.3',
-      rangeLower: 0.6,
-      rangeUpper: 1.3,
-      hasReferenceRange: true,
-      status: 'NORMAL',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      observation: 'Low optical confidence flag: potential smudge on decimal token',
-      sourceDocument: file.name,
-      pageNumber: 2,
-      confidence: 0.64,
-      isAiExtracted: true,
-      isHumanVerified: false,
-      isDemoFallback: true,
-      originalAiValue: '1.1',
-      originalAiUnit: 'mg/dL',
-      originalAiRange: '0.6 - 1.3',
-    },
-  ];
+      lines.forEach((line, idx) => {
+        const match = line.match(labPattern);
+        if (match) {
+          const testName = match[1].trim();
+          const rawVal = match[2].trim();
+          const unit = (match[3] || '').trim();
+          const lower = match[4] ? parseFloat(match[4]) : null;
+          const upper = match[5] ? parseFloat(match[5]) : null;
+          const numericVal = parseFloat(rawVal.replace(/[<>]/g, ''));
+          const hasRange = lower !== null && upper !== null;
+          const status = calculateReferenceRangeStatus(isNaN(numericVal) ? null : numericVal, lower, upper, hasRange);
+
+          if (testName.length > 2 && !isNaN(numericVal)) {
+            extractedRecords.push({
+              id: `ext-${Date.now()}-${idx}`,
+              testName,
+              value: rawVal,
+              numericValue: isNaN(numericVal) ? null : numericVal,
+              unit,
+              referenceRangeText: hasRange ? `${lower} - ${upper}` : 'REFERENCE RANGE UNAVAILABLE',
+              rangeLower: lower,
+              rangeUpper: upper,
+              hasReferenceRange: hasRange,
+              status,
+              date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              observation: `Extracted from source file "${file.name}"`,
+              sourceDocument: file.name,
+              pageNumber: 1,
+              confidence: 0.95,
+              isAiExtracted: true,
+              isHumanVerified: false,
+              isDemoFallback: false,
+              originalAiValue: rawVal,
+              originalAiUnit: unit,
+              originalAiRange: hasRange ? `${lower} - ${upper}` : 'REFERENCE RANGE UNAVAILABLE',
+            });
+          }
+        }
+      });
+    }
+  } catch {
+    // Non-text file or stream
+  }
 
   return {
-    records: fallbackRecords,
-    isDemoFallback: true,
+    records: extractedRecords,
+    isDemoFallback: false,
     documentTitle: file.name,
   };
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => resolve('');
+    reader.readAsText(file);
+  });
 }
 
 function readFileAsBase64(file: File): Promise<string> {

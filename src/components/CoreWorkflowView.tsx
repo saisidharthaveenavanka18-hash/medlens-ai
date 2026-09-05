@@ -19,28 +19,48 @@ import {
   Eye,
   UserCheck
 } from 'lucide-react';
-import { DocumentCategory } from '../types';
+import { DocumentCategory, PatientRecord } from '../types';
 import { 
   ExtractedLabRecord, 
-  FICTIONAL_DEMO_PATIENT, 
   calculateReferenceRangeStatus, 
   extractDocumentData 
 } from '../services/extractor';
 
 interface CoreWorkflowViewProps {
+  activePatient?: PatientRecord | null;
+  records?: ExtractedLabRecord[];
+  onUpdateRecords?: (records: ExtractedLabRecord[]) => void;
   onOpenDualPaneWithDoc?: (docId: string) => void;
+  onAddPatient?: () => void;
 }
 
 export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
+  activePatient,
+  records: externalRecords,
+  onUpdateRecords,
   onOpenDualPaneWithDoc,
+  onAddPatient,
 }) => {
   // Records in current structured medical record
-  const [records, setRecords] = useState<ExtractedLabRecord[]>(FICTIONAL_DEMO_PATIENT.records);
-  const [activePatientName, setActivePatientName] = useState<string>(FICTIONAL_DEMO_PATIENT.name);
-  const [activePatientAge, setActivePatientAge] = useState<number>(FICTIONAL_DEMO_PATIENT.age);
-  const [activePatientSex, setActivePatientSex] = useState<string>(FICTIONAL_DEMO_PATIENT.sex);
-  const [activeReports, setActiveReports] = useState(FICTIONAL_DEMO_PATIENT.reports);
-  const [isDemoActive, setIsDemoActive] = useState<boolean>(true);
+  const [internalRecords, setInternalRecords] = useState<ExtractedLabRecord[]>([]);
+  const records = externalRecords !== undefined ? externalRecords : internalRecords;
+  const setRecords = (update: ExtractedLabRecord[] | ((prev: ExtractedLabRecord[]) => ExtractedLabRecord[])) => {
+    if (typeof update === 'function') {
+      setInternalRecords((prev) => {
+        const next = update(prev);
+        if (onUpdateRecords) onUpdateRecords(next);
+        return next;
+      });
+    } else {
+      setInternalRecords(update);
+      if (onUpdateRecords) onUpdateRecords(update);
+    }
+  };
+
+  const activePatientName = activePatient?.name || 'No Patient Selected';
+  const activePatientAge = activePatient?.age !== undefined ? activePatient.age : '--';
+  const activePatientSex = activePatient?.sex || '--';
+  const [activeReports, setActiveReports] = useState<{ id: string; title: string; date: string; lab: string; pageCount: number }[]>([]);
 
   // Upload state
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory>('Laboratory Report');
@@ -59,20 +79,8 @@ export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
   const [editNotes, setEditNotes] = useState<string>('');
 
   // Supported extensions
-  const ALLOWED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg'];
-  const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-
-  // Handle Load Demo Patient (Fictional, works 100% offline)
-  const handleLoadDemoPatient = () => {
-    setActivePatientName(FICTIONAL_DEMO_PATIENT.name);
-    setActivePatientAge(FICTIONAL_DEMO_PATIENT.age);
-    setActivePatientSex(FICTIONAL_DEMO_PATIENT.sex);
-    setActiveReports(FICTIONAL_DEMO_PATIENT.reports);
-    setRecords(FICTIONAL_DEMO_PATIENT.records);
-    setIsDemoActive(true);
-    setUploadSuccessMessage('Loaded Fictional Demo Patient with 2 clinical reports, normal, low, high, missing range, and low-confidence test cases.');
-    setTimeout(() => setUploadSuccessMessage(null), 5000);
-  };
+  const ALLOWED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'];
+  const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'text/plain'];
 
   // Handle File Ingestion
   const handleFileUpload = async (fileList: FileList | File[]) => {

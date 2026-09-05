@@ -40,36 +40,6 @@ function logQuery(query: string, params: any[], durationMs: number, rowCount: nu
   }
 }
 
-// Initial default patient for instant demonstration
-export const INITIAL_DEMO_PATIENT: PatientRecord = {
-  id: 'pt-8942-intake',
-  name: 'Eleanor Vance',
-  age: 52,
-  sex: 'Female',
-  symptoms: [
-    { id: 'sym-1', name: 'Mild Afternoon Fatigue', severity: 'Mild', duration: '3 weeks', source: 'USER_PROVIDED' },
-    { id: 'sym-2', name: 'Occasional Joint Stiffness', severity: 'Mild', duration: '2 months', source: 'USER_PROVIDED' },
-    { id: 'sym-3', name: 'Post-prandial Drowsiness', severity: 'Moderate', duration: '6 weeks', source: 'USER_PROVIDED' },
-  ],
-  conditions: [
-    { id: 'con-1', name: 'Borderline Hyperlipidemia', status: 'Managed', diagnosedYear: '2023', source: 'USER_PROVIDED' },
-    { id: 'con-2', name: 'Mild Essential Hypertension', status: 'Managed', diagnosedYear: '2021', source: 'USER_PROVIDED' },
-  ],
-  allergies: [
-    { id: 'alg-1', allergen: 'Penicillin', reaction: 'Urticaria / Skin Rash', severity: 'Moderate', source: 'USER_PROVIDED' },
-    { id: 'alg-2', allergen: 'Shellfish', reaction: 'Lip Swelling', severity: 'Severe', source: 'USER_PROVIDED' },
-  ],
-  medications: [
-    { id: 'med-1', name: 'Atorvastatin', dosage: '10mg', frequency: 'Once daily (Evening)', purpose: 'Lipid management', source: 'USER_PROVIDED' },
-    { id: 'med-2', name: 'CoQ10 Ubiquinol', dosage: '100mg', frequency: 'Once daily (Morning)', purpose: 'Cellular energy supplement', source: 'USER_PROVIDED' },
-  ],
-  medicalHistory: 'Family history of Type 2 Diabetes (maternal grandfather) and Coronary Artery Disease (father, age 64). Non-smoker, walks 30 minutes 4 times per week.',
-  additionalNotes: 'Requested comprehensive annual lab review. Exploring Mediterranean dietary adjustments to support healthy metabolic and lipid trajectories.',
-  source: 'USER_PROVIDED',
-  createdAt: '2024-01-14T10:30:00Z',
-  updatedAt: '2024-01-14T10:30:00Z',
-};
-
 // Initialize PostgreSQL engine & relational tables
 export async function getPgDatabase(): Promise<PGlite> {
   if (pgInstance && isDbInitialized) {
@@ -158,20 +128,18 @@ export async function getPgDatabase(): Promise<PGlite> {
     isDbInitialized = true;
     logQuery('CREATE SCHEMA [patients, symptoms, conditions, allergies, medications, documents]', [], performance.now() - startTime, 6);
 
-    // Seed default demo patient if empty
-    const checkRes = await pgInstance.query('SELECT COUNT(*) as count FROM patients');
-    const count = parseInt((checkRes.rows[0] as any)?.count || '0', 10);
-    if (count === 0) {
-      await savePatientToPostgres(INITIAL_DEMO_PATIENT);
-    }
-
-    // Seed default documents if empty
-    const checkDocRes = await pgInstance.query('SELECT COUNT(*) as count FROM documents');
-    const docCount = parseInt((checkDocRes.rows[0] as any)?.count || '0', 10);
-    if (docCount === 0) {
-      for (const d of INITIAL_DEMO_DOCUMENTS) {
-        await saveDocumentToPostgres(d);
+    // Purge any legacy demo data from prior sessions
+    try {
+      await pgInstance.query("DELETE FROM patients WHERE id = 'pt-8942-intake' OR name = 'Eleanor Vance'");
+      await pgInstance.query("DELETE FROM documents WHERE patient_id = 'pt-8942-intake'");
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('medlens_patient_pt-8942-intake');
+        if (localStorage.getItem('medlens_active_patient_id') === 'pt-8942-intake') {
+          localStorage.removeItem('medlens_active_patient_id');
+        }
       }
+    } catch {
+      // Ignore cleanup error
     }
   }
 
@@ -319,82 +287,43 @@ export async function getPatientFromPostgres(patientId: string): Promise<Patient
   return patient;
 }
 
-// Initial Demo Managed Documents
-export const INITIAL_DEMO_DOCUMENTS: ManagedDocument[] = [
-  {
-    id: 'doc-item-1',
-    patientId: 'pt-8942-intake',
-    filename: 'CBC_Comprehensive_Metabolic_Panel.pdf',
-    fileType: 'pdf',
-    fileSize: 254820,
-    documentCategory: 'Laboratory Report',
-    uploadTimestamp: '2024-01-15T14:20:00Z',
-    processingStatus: 'Processed',
-    extractionStatus: 'Extracted',
-    verificationStatus: 'Verified',
-    fileHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    linkedLabReportId: 'doc-quest-2024-01',
-    previewSnippet: 'Quest Diagnostics: Glucose (94 mg/dL), Total Cholesterol (228 mg/dL), Creatinine (0.98 mg/dL)',
-  },
-  {
-    id: 'doc-item-2',
-    patientId: 'pt-8942-intake',
-    filename: 'Routine_6Month_Metabolic_Followup.pdf',
-    fileType: 'pdf',
-    fileSize: 196410,
-    documentCategory: 'Laboratory Report',
-    uploadTimestamp: '2024-06-20T11:05:00Z',
-    processingStatus: 'Processed',
-    extractionStatus: 'Extracted',
-    verificationStatus: 'Verified',
-    fileHash: '4a6b291c98fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852c912',
-    linkedLabReportId: 'doc-labcorp-2024-06',
-    previewSnippet: 'Labcorp Central: Glucose (104 mg/dL), Cholesterol (204 mg/dL), AST (36 U/L - Assay Divergence)',
-  },
-  {
-    id: 'doc-item-3',
-    patientId: 'pt-8942-intake',
-    filename: 'Hospital_Outpatient_Fax_Scan.pdf',
-    fileType: 'pdf',
-    fileSize: 421000,
-    documentCategory: 'Laboratory Report',
-    uploadTimestamp: '2025-02-10T09:12:00Z',
-    processingStatus: 'Processed',
-    extractionStatus: 'Extracted',
-    verificationStatus: 'Needs Verification',
-    fileHash: 'f7c3bc1d98fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852ff34',
-    linkedLabReportId: 'doc-hospital-2025-02',
-    previewSnippet: 'City Health Hospital: Glucose (112 mg/dL), Creatinine (1.05 mg/dL - Smudged OCR), hs-CRP (1.8 mg/L)',
-  },
-  {
-    id: 'doc-item-4',
-    patientId: 'pt-8942-intake',
-    filename: 'Atorvastatin_Prescription_Order.jpg',
-    fileType: 'jpg',
-    fileSize: 124500,
-    documentCategory: 'Prescription',
-    uploadTimestamp: '2024-01-16T16:45:00Z',
-    processingStatus: 'Processed',
-    extractionStatus: 'Extracted',
-    verificationStatus: 'Verified',
-    fileHash: '98d7fa2b6318fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7834a8',
-    previewSnippet: 'Rx: Atorvastatin Calcium 10mg Tablets, Sig: 1 tab PO qHS #90 refills 3, Dr. Miller',
-  },
-  {
-    id: 'doc-item-5',
-    patientId: 'pt-8942-intake',
-    filename: 'Cardiology_Consultation_Summary.png',
-    fileType: 'png',
-    fileSize: 531200,
-    documentCategory: 'Medical Record',
-    uploadTimestamp: '2024-02-01T10:15:00Z',
-    processingStatus: 'Processed',
-    extractionStatus: 'Extracted',
-    verificationStatus: 'Needs Verification',
-    fileHash: '11a8c90321fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78912ef',
-    previewSnippet: 'Clinical Summary: Evaluation of cardiovascular risk profile, CAC score discussion, lifestyle intervention.',
-  },
-];
+// Fetch all patients from PostgreSQL
+export async function getAllPatientsFromPostgres(): Promise<PatientRecord[]> {
+  const pg = await getPgDatabase();
+  const startTime = performance.now();
+
+  const res = await pg.query('SELECT id FROM patients ORDER BY created_at DESC');
+  const patients: PatientRecord[] = [];
+  for (const row of res.rows as any[]) {
+    const p = await getPatientFromPostgres(row.id);
+    if (p) patients.push(p);
+  }
+
+  const duration = performance.now() - startTime;
+  logQuery('SELECT ALL PATIENTS', [], duration, patients.length);
+  return patients;
+}
+
+// Delete Patient and all linked records from PostgreSQL (cascading)
+export async function deletePatientFromPostgres(patientId: string): Promise<void> {
+  const pg = await getPgDatabase();
+  const startTime = performance.now();
+
+  await pg.query('DELETE FROM patients WHERE id = $1', [patientId]);
+  const duration = performance.now() - startTime;
+  logQuery(`DELETE PATIENT [id: ${patientId}]`, [patientId], duration, 1);
+
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(`medlens_patient_${patientId}`);
+      if (localStorage.getItem('medlens_active_patient_id') === patientId) {
+        localStorage.removeItem('medlens_active_patient_id');
+      }
+    }
+  } catch (err) {
+    console.warn('LocalStorage cleanup error', err);
+  }
+}
 
 // Save a Managed Document to PostgreSQL
 export async function saveDocumentToPostgres(doc: ManagedDocument): Promise<void> {

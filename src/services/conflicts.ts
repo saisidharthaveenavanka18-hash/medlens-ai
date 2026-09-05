@@ -18,80 +18,72 @@ export interface PotentialConflict {
   isResolved?: boolean;
 }
 
-export const DEMO_POTENTIAL_CONFLICTS: PotentialConflict[] = [
-  {
-    id: 'conf-allergy-1',
-    category: 'ALLERGY',
-    title: 'Allergy Information Inconsistency',
-    sourceA: {
-      label: 'Patient-Reported Allergy',
-      value: 'Penicillin (Reaction: Hives & Cutaneous Rash)',
-      sourceName: 'Patient Intake Record (Patient Provided)',
-    },
-    sourceB: {
-      label: 'Clinical Document Record',
-      value: 'NKDA (No Known Drug Allergies listed)',
-      sourceName: 'Hospital Outpatient Face Sheet (Extracted from Report)',
-    },
-    instruction: 'Please verify this information with the patient before prescribing.',
-  },
-  {
-    id: 'conf-med-1',
-    category: 'MEDICATION',
-    title: 'Medication Regimen Discrepancy',
-    sourceA: {
-      label: 'Patient-Reported Medication',
-      value: 'Atorvastatin 20 mg Oral Tablet (Daily)',
-      sourceName: 'Patient Intake Record (Patient Provided)',
-    },
-    sourceB: {
-      label: 'Report Medication Order',
-      value: 'Simvastatin 10 mg Oral Tablet (Nightly)',
-      sourceName: 'Prior Outpatient Encounter Summary (Extracted from Report)',
-    },
-    instruction: 'Please verify this information to confirm current active lipid therapy.',
-  },
-  {
-    id: 'conf-demographics-1',
-    category: 'PATIENT_INFO',
-    title: 'Patient Demographic Variance',
-    sourceA: {
-      label: 'Intake Profile Age',
-      value: '52 Years Old (DOB: 1973)',
-      sourceName: 'Patient Intake Record (Patient Provided)',
-    },
-    sourceB: {
-      label: 'Lab Accession Age',
-      value: '51 Years Old (Printed on specimen accession header)',
-      sourceName: 'Quest Diagnostics Specimen Order (Extracted from Report)',
-    },
-    instruction: 'Please verify this information against official identification.',
-  },
-  {
-    id: 'conf-dup-1',
-    category: 'DUPLICATE_DOCUMENT',
-    title: 'Potential Duplicate Laboratory Document',
-    sourceA: {
-      label: 'Uploaded File #1',
-      value: 'Quest_Diagnostics_CMP_CBC_Feb2025.pdf (Accession: #Q-889104)',
-      sourceName: 'Document Vault (Ingested Feb 14, 2025)',
-    },
-    sourceB: {
-      label: 'Uploaded File #2',
-      value: 'Quest_Lab_Panel_Copy_2025.pdf (Accession: #Q-889104)',
-      sourceName: 'Document Vault (Ingested Feb 15, 2025)',
-    },
-    instruction: 'Please verify this information to ensure identical tests are not counted twice.',
-  },
-];
+export const DEMO_POTENTIAL_CONFLICTS: PotentialConflict[] = [];
 
 /**
- * Evaluates patient record and documents for inconsistencies
+ * Evaluates patient record and documents for authentic cross-record inconsistencies
  */
 export function detectPotentialConflicts(
-  patient: PatientRecord,
+  patient: PatientRecord | null,
   documents: ManagedDocument[]
 ): PotentialConflict[] {
-  // Returns demo potential conflicts with live references
-  return DEMO_POTENTIAL_CONFLICTS;
+  if (!patient || documents.length === 0) {
+    return [];
+  }
+
+  const conflicts: PotentialConflict[] = [];
+
+  // 1. Detect duplicate document files (same hash or same name uploaded multiple times)
+  const seenHashes: Record<string, ManagedDocument> = {};
+  const seenNames: Record<string, ManagedDocument> = {};
+
+  for (const doc of documents) {
+    if (doc.fileHash && seenHashes[doc.fileHash]) {
+      const prior = seenHashes[doc.fileHash];
+      conflicts.push({
+        id: `conf-dup-${doc.id}`,
+        category: 'DUPLICATE_DOCUMENT',
+        title: 'Potential Duplicate Laboratory Document',
+        sourceA: {
+          label: 'Existing Document',
+          value: `${prior.filename} (${prior.documentCategory})`,
+          sourceName: 'Document Vault',
+        },
+        sourceB: {
+          label: 'New Upload',
+          value: `${doc.filename} (${doc.documentCategory})`,
+          sourceName: 'Document Vault',
+        },
+        instruction: 'Please verify whether this document is a duplicate to prevent double-counting measurements.',
+      });
+    } else if (doc.fileHash) {
+      seenHashes[doc.fileHash] = doc;
+    }
+
+    if (doc.filename && seenNames[doc.filename.toLowerCase()]) {
+      const prior = seenNames[doc.filename.toLowerCase()];
+      if (prior.id !== doc.id && (!doc.fileHash || doc.fileHash !== prior.fileHash)) {
+        conflicts.push({
+          id: `conf-name-${doc.id}`,
+          category: 'DUPLICATE_DOCUMENT',
+          title: 'Matching Filename Uploaded',
+          sourceA: {
+            label: 'Prior Ingestion',
+            value: prior.filename,
+            sourceName: 'Document Vault',
+          },
+          sourceB: {
+            label: 'Recent Ingestion',
+            value: doc.filename,
+            sourceName: 'Document Vault',
+          },
+          instruction: 'Please confirm whether these represent consecutive versions of the same encounter.',
+        });
+      }
+    } else if (doc.filename) {
+      seenNames[doc.filename.toLowerCase()] = doc;
+    }
+  }
+
+  return conflicts;
 }

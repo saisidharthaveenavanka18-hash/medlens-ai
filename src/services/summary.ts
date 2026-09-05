@@ -28,8 +28,22 @@ export interface SafeSummaryData {
 export function generateSafeAiSummary(
   records: ExtractedLabRecord[],
   documents: ManagedDocument[],
-  patient: PatientRecord
+  patient: PatientRecord | null
 ): SafeSummaryData {
+  const disclaimer = 'This summary organizes information from the available records and is not a medical diagnosis or treatment recommendation.';
+
+  if (!patient) {
+    return {
+      documentsCount: 0,
+      testsFoundCount: 0,
+      outsideRangeTests: [],
+      observedChanges: [],
+      requiringVerificationCount: 0,
+      summaryText: 'No patient selected. Add or select a patient to generate clinical summaries.',
+      disclaimer,
+    };
+  }
+
   const outside = records.filter(
     (r) => r.status === 'LOW' || r.status === 'HIGH'
   ).map((r) => ({
@@ -42,36 +56,72 @@ export function generateSafeAiSummary(
 
   const unverified = records.filter((r) => !r.isHumanVerified || r.confidence < 0.7);
 
-  const changes = [
-    {
-      testName: 'Fasting Blood Glucose',
-      previous: '94 mg/dL (Jan 2024)',
-      current: '114 mg/dL (Feb 2025)',
-      delta: '+20.0 mg/dL observed increase across test dates',
-    },
-    {
-      testName: 'Total Cholesterol',
-      previous: '228 mg/dL (Jan 2024)',
-      current: '185 mg/dL (Jan 2024 re-test)',
-      delta: '-43.0 mg/dL observed reduction across test dates',
-    },
-  ];
+  // Compute actual observed numerical changes across matching tests in multiple documents
+  const testHistories: Record<string, ExtractedLabRecord[]> = {};
+  for (const rec of records) {
+    const key = rec.testName.toLowerCase().trim();
+    if (!testHistories[key]) testHistories[key] = [];
+    testHistories[key].push(rec);
+  }
 
-  const disclaimer = 'This summary organizes information from the available records and is not a medical diagnosis or treatment recommendation.';
+  const changes: {
+    testName: string;
+    previous: string;
+    current: string;
+    delta: string;
+  }[] = [];
 
-  const summaryParagraphs = [
-    `Currently, ${documents.length || 2} medical documents are on record for ${patient.name}. A total of ${records.length} structured laboratory tests have been extracted.`,
-    outside.length > 0
-      ? `Based strictly on the testing facilities' printed intervals, ${outside.length} test(s) have values outside their lab-provided reference ranges: ${outside.map((o) => `${o.testName} (${o.value} ${o.unit}, normal ref: ${o.range})`).join('; ')}.`
-      : 'All extracted tests with printed ranges fall within their respective laboratory thresholds.',
-    `Observed numerical changes across sequential reports include: ${changes.map((c) => `${c.testName} shifted from ${c.previous} to ${c.current} (${c.delta})`).join('; ')}.`,
-    unverified.length > 0
-      ? `There are ${unverified.length} test item(s) pending human sign-off or exhibiting low optical confidence.`
-      : 'All extracted records have completed human verification.',
-  ];
+  for (const group of Object.values(testHistories)) {
+    if (group.length >= 2) {
+      const oldest = group[group.length - 1];
+      const latest = group[0];
+      if (oldest.numericValue !== null && latest.numericValue !== null) {
+        const diff = Number((latest.numericValue - oldest.numericValue).toFixed(2));
+        const deltaStr = diff > 0 ? `+${diff} ${latest.unit} observed increase` : `${diff} ${latest.unit} observed change`;
+        changes.push({
+          testName: latest.testName,
+          previous: `${oldest.value} ${oldest.unit} (${oldest.date})`,
+          current: `${latest.value} ${latest.unit} (${latest.date})`,
+          delta: deltaStr,
+        });
+      }
+    }
+  }
+
+  const summaryParagraphs: string[] = [];
+
+  summaryParagraphs.push(
+    `Currently, ${documents.length} medical document${documents.length === 1 ? '' : 's'} on record for ${patient.name}. A total of ${records.length} structured laboratory measurement${records.length === 1 ? '' : 's'} have been extracted.`
+  );
+
+  if (records.length > 0) {
+    if (outside.length > 0) {
+      summaryParagraphs.push(
+        `Based strictly on the testing facilities' printed intervals, ${outside.length} test(s) have values outside their lab-provided reference ranges: ${outside.map((o) => `${o.testName} (${o.value} ${o.unit}, normal ref: ${o.range})`).join('; ')}.`
+      );
+    } else {
+      summaryParagraphs.push('All extracted tests with printed ranges fall within their respective laboratory thresholds.');
+    }
+
+    if (changes.length > 0) {
+      summaryParagraphs.push(
+        `Observed numerical changes across sequential reports include: ${changes.map((c) => `${c.testName} shifted from ${c.previous} to ${c.current} (${c.delta})`).join('; ')}.`
+      );
+    }
+
+    if (unverified.length > 0) {
+      summaryParagraphs.push(
+        `There are ${unverified.length} test item(s) pending human sign-off or exhibiting low optical confidence.`
+      );
+    } else {
+      summaryParagraphs.push('All extracted records have completed human verification.');
+    }
+  } else {
+    summaryParagraphs.push('No structured laboratory tests have been extracted yet. Upload a laboratory report to populate test results.');
+  }
 
   return {
-    documentsCount: documents.length || 2,
+    documentsCount: documents.length,
     testsFoundCount: records.length,
     outsideRangeTests: outside,
     observedChanges: changes,

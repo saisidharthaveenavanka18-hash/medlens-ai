@@ -29,11 +29,12 @@ import {
 
 interface DocumentManagerViewProps {
   documents: ManagedDocument[];
-  activePatient: PatientRecord;
+  activePatient: PatientRecord | null;
   onUploadDocuments: (files: File[], defaultCategory: DocumentCategory) => Promise<void>;
   onDeleteDocument: (docId: string) => Promise<void>;
   onUpdateDocumentCategory: (docId: string, category: DocumentCategory) => Promise<void>;
   onOpenInDualPane: (linkedLabReportId?: string) => void;
+  onAddPatient?: () => void;
 }
 
 export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
@@ -43,6 +44,7 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
   onDeleteDocument,
   onUpdateDocumentCategory,
   onOpenInDualPane,
+  onAddPatient,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
@@ -218,7 +220,11 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
               </span>
             </div>
             <p style={{ fontSize: '0.8125rem', color: '#1E40AF', margin: '0.2rem 0 0' }}>
-              Managing records for: <strong style={{ color: '#1E3A8A' }}>{activePatient.name}</strong> (ID: {activePatient.id})
+              {activePatient ? (
+                <>Managing records for: <strong style={{ color: '#1E3A8A' }}>{activePatient.name}</strong> (ID: {activePatient.id})</>
+              ) : (
+                <>No active patient selected</>
+              )}
             </p>
           </div>
         </div>

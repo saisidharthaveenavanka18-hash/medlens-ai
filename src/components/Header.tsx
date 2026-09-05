@@ -3,26 +3,26 @@ import {
   Activity, 
   UploadCloud, 
   HelpCircle,
-  Stethoscope,
+  Stethoscope, 
   UserCheck,
   Layers,
-  Sparkles
+  User,
+  UserPlus
 } from 'lucide-react';
-import { NavigationTab, UserMode } from '../types';
-import { DEMO_PRESETS } from '../data/mockData';
+import { NavigationTab, UserMode, PatientRecord } from '../types';
 
 interface HeaderProps {
   activeTab: NavigationTab;
   onSelectTab: (tab: NavigationTab) => void;
   userMode: UserMode;
   onToggleUserMode: (mode: UserMode) => void;
-  activePresetId: string;
-  onSelectPreset: (presetId: string) => void;
   onOpenUpload: () => void;
-  onOpenJudgeTour: () => void;
   onOpenSafetyModal: () => void;
   pendingReviewCount: number;
-  onLoadDemoPatient?: () => void;
+  activePatient: PatientRecord | null;
+  allPatients?: PatientRecord[];
+  onSelectPatient?: (patientId: string) => void;
+  onAddPatient?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,12 +30,12 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab,
   userMode,
   onToggleUserMode,
-  activePresetId,
-  onSelectPreset,
   onOpenUpload,
-  onOpenJudgeTour,
   onOpenSafetyModal,
-  onLoadDemoPatient,
+  activePatient,
+  allPatients = [],
+  onSelectPatient,
+  onAddPatient,
 }) => {
   return (
     <header style={{
@@ -56,7 +56,10 @@ export const Header: React.FC<HeaderProps> = ({
         margin: '0 auto',
       }}>
         {/* Brand Logo & Subtitle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div 
+          onClick={() => onSelectTab('dashboard')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}
+        >
           <div style={{
             width: 32,
             height: 32,
@@ -94,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Clinical Intelligence
               </span>
             </div>
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.1 }}>
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.1, margin: 0 }}>
               AI Clinical Information Intelligence
             </p>
           </div>
@@ -102,30 +105,65 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {/* Demo Preset Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Preset:</span>
-            <select
-              value={activePresetId}
-              onChange={(e) => onSelectPreset(e.target.value)}
+          
+          {/* Active Patient Switcher / Indicator */}
+          {allPatients.length > 1 && onSelectPatient ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Patient:</span>
+              <select
+                value={activePatient?.id || ''}
+                onChange={(e) => onSelectPatient(e.target.value)}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.75rem',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                {allPatients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.age}Y)
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : activePatient ? (
+            <div 
+              onClick={() => onSelectTab('patient-intake')}
               style={{
-                backgroundColor: '#FFFFFF',
-                color: 'var(--text-main)',
-                border: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.25rem 0.6rem',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
                 borderRadius: '6px',
-                padding: '0.25rem 0.5rem',
                 fontSize: '0.75rem',
-                outline: 'none',
                 cursor: 'pointer',
               }}
+              title="Click to view patient profile"
             >
-              {DEMO_PRESETS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.badge}: {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <User size={13} color="#2563EB" />
+              <span style={{ fontWeight: 600, color: '#334155' }}>{activePatient.name}</span>
+              <span style={{ color: '#64748B' }}>({activePatient.age}Y)</span>
+            </div>
+          ) : (
+            onAddPatient && (
+              <button
+                onClick={onAddPatient}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+              >
+                <UserPlus size={13} />
+                + Add Patient
+              </button>
+            )
+          )}
 
           {/* Clean Segmented Control: Patient View / Clinician Auditor */}
           <div style={{ 
@@ -180,7 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Core Workflow (Upload & Review) */}
+          {/* Core Workflow */}
           <button
             onClick={() => onSelectTab('workflow')}
             className={`btn btn-sm ${activeTab === 'workflow' ? 'btn-primary' : 'btn-secondary'}`}
@@ -190,45 +228,14 @@ export const Header: React.FC<HeaderProps> = ({
             Core Workflow
           </button>
 
-          {/* Load Demo Patient */}
-          {onLoadDemoPatient && (
-            <button
-              onClick={onLoadDemoPatient}
-              className="btn btn-secondary btn-sm"
-              style={{
-                borderColor: '#BFDBFE',
-                backgroundColor: '#EFF6FF',
-                color: '#1E40AF',
-                fontWeight: 600,
-                fontSize: '0.75rem',
-              }}
-              title="Reset & Load complete fictional demo patient Eleanor Vance"
-            >
-              <Sparkles size={13} color="#2563EB" />
-              Load Demo
-            </button>
-          )}
-
-          {/* Hackathon Judge Guide */}
-          <button
-            onClick={onOpenJudgeTour}
-            className="btn btn-secondary btn-sm"
-            style={{
-              borderColor: '#FDE68A',
-              backgroundColor: '#FFFBEB',
-              color: '#92400E',
-            }}
-          >
-            Judge Guide
-          </button>
-
-          {/* Primary Action: Upload Lab PDF */}
+          {/* Upload Lab PDF */}
           <button
             onClick={onOpenUpload}
             className="btn btn-primary btn-sm"
+            style={{ fontSize: '0.75rem' }}
           >
-            <UploadCloud size={15} />
-            Upload Lab PDF
+            <UploadCloud size={14} />
+            Upload Report
           </button>
 
           {/* Help Icon */}

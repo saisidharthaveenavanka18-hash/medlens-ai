@@ -20,7 +20,8 @@ interface SidebarProps {
   onSelectTab: (tab: NavigationTab) => void;
   pendingReviewCount: number;
   onOpenSafetyModal: () => void;
-  activePatient: PatientRecord;
+  activePatient: PatientRecord | null;
+  onAddPatient?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingReviewCount,
   onOpenSafetyModal,
   activePatient,
+  onAddPatient,
 }) => {
   const navItems = [
     {
@@ -177,29 +179,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
           padding: '0.55rem 0.65rem',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '0.45rem',
         }}>
-          <div style={{
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            backgroundColor: 'var(--bg-secondary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-secondary)',
-            flexShrink: 0,
-          }}>
-            <User size={15} />
-          </div>
-          <div className="sidebar-label" style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              {activePatient.name}
+          {activePatient ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', overflow: 'hidden' }}>
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                backgroundColor: 'var(--bg-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                flexShrink: 0,
+              }}>
+                <User size={15} />
+              </div>
+              <div className="sidebar-label" style={{ overflow: 'hidden' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  {activePatient.name}
+                </div>
+                <div style={{ fontSize: '0.675rem', color: 'var(--text-secondary)' }}>
+                  {activePatient.age}Y &bull; {activePatient.sex}
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: '0.675rem', color: 'var(--text-secondary)' }}>
-              {activePatient.age}Y &bull; {activePatient.sex}
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <span className="sidebar-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>No active patient</span>
+              {onAddPatient && (
+                <button
+                  onClick={onAddPatient}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#2563EB',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  + Add
+                </button>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </aside>
