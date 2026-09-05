@@ -9,7 +9,6 @@ import {
   ManagedDocument,
   DocumentCategory
 } from './types';
-import { MOCK_DOCUMENTS, MOCK_CONFLICTS, DEMO_PRESETS } from './data/mockData';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SafetyDisclaimerBanner, SafetyModal } from './components/SafetyDisclaimer';
@@ -20,7 +19,6 @@ import { HitlVerificationModal } from './components/HitlVerificationModal';
 import { HitlQueueView } from './components/HitlQueueView';
 import { DoctorQuestions } from './components/DoctorQuestions';
 import { UploadModal } from './components/UploadModal';
-import { JudgeWalkthroughModal } from './components/JudgeWalkthroughModal';
 import { PatientIntakeForm } from './components/PatientIntakeForm';
 import { PatientProfileView } from './components/PatientProfileView';
 import { DocumentManagerView } from './components/DocumentManagerView';
@@ -28,54 +26,58 @@ import { CoreWorkflowView } from './components/CoreWorkflowView';
 import { DashboardView } from './components/DashboardView';
 import { ReportComparisonView } from './components/ReportComparisonView';
 import { TimelineView } from './components/TimelineView';
-import { FICTIONAL_DEMO_PATIENT } from './services/extractor';
 import { 
-  INITIAL_DEMO_PATIENT, 
-  INITIAL_DEMO_DOCUMENTS,
+  getAllPatientsFromPostgres,
   savePatientToPostgres, 
   getPatientFromPostgres, 
+  deletePatientFromPostgres,
   getPgDatabase,
   saveDocumentToPostgres,
   getDocumentsByPatientFromPostgres,
   deleteDocumentFromPostgres,
   updateDocumentStatusInPostgres
 } from './services/db';
+import { FileText, UploadCloud, UserPlus } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
   const [userMode, setUserMode] = useState<UserMode>('patient');
-  const [activePresetId, setActivePresetId] = useState<string>('preset-provenance');
-  const [documents, setDocuments] = useState<DocumentMeta[]>(MOCK_DOCUMENTS);
-  const [activeDocId, setActiveDocId] = useState<string>('doc-quest-2024-01');
-  const [selectedBiomarkerId, setSelectedBiomarkerId] = useState<string | null>('bm-chol-2024');
-
-  // Patient Intake State (SOURCE = USER_PROVIDED)
-  const [activePatient, setActivePatient] = useState<PatientRecord>(INITIAL_DEMO_PATIENT);
+  
+  // Real Patient state - starts empty with zero fake records
+  const [patients, setPatients] = useState<PatientRecord[]>([]);
+  const [activePatient, setActivePatient] = useState<PatientRecord | null>(null);
   const [isIntakeEditing, setIsIntakeEditing] = useState<boolean>(false);
 
-  // Managed Medical Documents Vault State (PostgreSQL backed)
-  const [managedDocs, setManagedDocs] = useState<ManagedDocument[]>(INITIAL_DEMO_DOCUMENTS);
-  
+  // Real Documents state - starts empty
+  const [documents, setDocuments] = useState<DocumentMeta[]>([]);
+  const [managedDocs, setManagedDocs] = useState<ManagedDocument[]>([]);
+  const [activeDocId, setActiveDocId] = useState<string>('');
+  const [selectedBiomarkerId, setSelectedBiomarkerId] = useState<string | null>(null);
+
   // Modals state
   const [verifyingBiomarker, setVerifyingBiomarker] = useState<BiomarkerRecord | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
-  const [isJudgeTourOpen, setIsJudgeTourOpen] = useState<boolean>(false);
   const [isSafetyModalOpen, setIsSafetyModalOpen] = useState<boolean>(false);
 
-  // Initialize PostgreSQL and load persisted patient & document records
+  // Initialize PostgreSQL and load persisted real patient & document records
   useEffect(() => {
     async function initDb() {
       try {
         await getPgDatabase();
-        const savedId = localStorage.getItem('medlens_active_patient_id') || INITIAL_DEMO_PATIENT.id;
-        const loadedPatient = await getPatientFromPostgres(savedId);
-        if (loadedPatient) {
-          setActivePatient(loadedPatient);
-        }
+        const allPts = await getAllPatientsFromPostgres();
+        setPatients(allPts);
 
-        const loadedDocs = await getDocumentsByPatientFromPostgres(savedId);
-        if (loadedDocs && loadedDocs.length > 0) {
-          setManagedDocs(loadedDocs);
+        const savedId = localStorage.getItem('medlens_active_patient_id');
+        const matched = savedId ? allPts.find((p) => p.id === savedId) : null;
+        const current = matched || (allPts.length > 0 ? allPts[0] : null);
+
+        setActivePatient(current);
+
+        if (current) {
+          const loadedDocs = await getDocumentsByPatientFromPostgres(current.id);
+          setManagedDocs(loadedDocs || []);
+        } else {
+          setManagedDocs([]);
         }
       } catch (err) {
         console.warn('PostgreSQL initialization notice', err);
@@ -85,37 +87,24 @@ export const App: React.FC = () => {
   }, []);
 
   // Active document for dual-pane
-  const activeDocument = documents.find((d) => d.id === activeDocId) || documents[0];
+  const activeDocument = documents.find((d) => d.id === activeDocId) || (documents.length > 0 ? documents[0] : null);
 
   // Count pending reviews across all documents
   const pendingReviewCount = documents.reduce((acc, doc) => {
     return acc + doc.biomarkers.filter((b) => b.verificationStatus === 'PENDING' || b.confidence < 0.7).length;
   }, 0);
 
-  // Handle Preset Switching
-  const handleSelectPreset = (presetId: string) => {
-    const preset = DEMO_PRESETS.find((p) => p.id === presetId);
-    if (!preset) return;
+  // Switch active patient
+  const handleSelectPatient = async (patient: PatientRecord) => {
+    setActivePatient(patient);
+    localStorage.setItem('medlens_active_patient_id', patient.id);
+    setIsIntakeEditing(false);
 
-    setActivePresetId(presetId);
-    setActiveTab(preset.defaultView);
-
-    if (preset.documentIds.length > 0) {
-      setActiveDocId(preset.documentIds[0]);
-    }
-
-    if (preset.highlightBiomarkerId) {
-      setSelectedBiomarkerId(preset.highlightBiomarkerId);
-    }
-
-    // If HITL preset, automatically open verification modal on the smudged item in clinician mode
-    if (preset.id === 'preset-hitl') {
-      setUserMode('clinician');
-      const targetDoc = documents.find((d) => d.id === 'doc-hospital-2025-02');
-      const targetBm = targetDoc?.biomarkers.find((b) => b.id === 'bm-creat-2025-02');
-      if (targetBm) {
-        setVerifyingBiomarker(targetBm);
-      }
+    try {
+      const loadedDocs = await getDocumentsByPatientFromPostgres(patient.id);
+      setManagedDocs(loadedDocs || []);
+    } catch (err) {
+      console.warn('Failed to load patient documents', err);
     }
   };
 
@@ -139,21 +128,54 @@ export const App: React.FC = () => {
   // Handle Patient Intake Save (persists to PostgreSQL)
   const handleSavePatientIntake = async (patient: PatientRecord) => {
     await savePatientToPostgres(patient);
+    setPatients((prev) => {
+      const idx = prev.findIndex((p) => p.id === patient.id);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = patient;
+        return updated;
+      }
+      return [...prev, patient];
+    });
     setActivePatient(patient);
+    localStorage.setItem('medlens_active_patient_id', patient.id);
     setIsIntakeEditing(false);
+    setActiveTab('patient-intake');
+  };
+
+  // Delete Patient and associated records
+  const handleDeletePatient = async (patientId: string) => {
+    await deletePatientFromPostgres(patientId);
+    const remaining = patients.filter((p) => p.id !== patientId);
+    setPatients(remaining);
+
+    if (activePatient?.id === patientId) {
+      const next = remaining.length > 0 ? remaining[0] : null;
+      setActivePatient(next);
+      if (next) {
+        localStorage.setItem('medlens_active_patient_id', next.id);
+        const loadedDocs = await getDocumentsByPatientFromPostgres(next.id);
+        setManagedDocs(loadedDocs || []);
+      } else {
+        localStorage.removeItem('medlens_active_patient_id');
+        setManagedDocs([]);
+      }
+    }
   };
 
   // Handle Multi-Document Upload with Validation & PostgreSQL Persistence
   const handleUploadDocuments = async (files: File[], defaultCategory: DocumentCategory) => {
     const newManagedDocs: ManagedDocument[] = [];
+    const patientId = activePatient ? activePatient.id : 'unassigned';
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const ext = (file.name.split('.').pop()?.toLowerCase() || 'pdf') as ManagedDocument['fileType'];
+      const docId = `doc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`;
       
       const docItem: ManagedDocument = {
-        id: `doc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-        patientId: activePatient.id,
+        id: docId,
+        patientId,
         filename: file.name,
         fileType: ext,
         fileSize: file.size,
@@ -164,10 +186,12 @@ export const App: React.FC = () => {
         verificationStatus: 'Needs Verification',
         fileHash: `hash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         previewSnippet: `Uploaded via secure portal: ${file.name} (${ext.toUpperCase()})`,
-        linkedLabReportId: defaultCategory === 'Laboratory Report' ? 'doc-quest-2024-01' : undefined,
+        linkedLabReportId: docId,
       };
 
-      await saveDocumentToPostgres(docItem);
+      if (activePatient) {
+        await saveDocumentToPostgres(docItem);
+      }
       newManagedDocs.push(docItem);
     }
 
@@ -178,6 +202,11 @@ export const App: React.FC = () => {
   const handleDeleteDocument = async (docId: string) => {
     await deleteDocumentFromPostgres(docId);
     setManagedDocs((prev) => prev.filter((d) => d.id !== docId));
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    if (activeDocId === docId) {
+      const remaining = documents.filter((d) => d.id !== docId);
+      setActiveDocId(remaining.length > 0 ? remaining[0].id : '');
+    }
   };
 
   // Update Document Category
@@ -226,42 +255,62 @@ export const App: React.FC = () => {
   };
 
   // Handle Upload Success from Modal
-  const handleUploadSuccess = (newDoc: DocumentMeta) => {
-    if (!documents.some((d) => d.id === newDoc.id)) {
-      setDocuments([newDoc, ...documents]);
-    }
+  const handleUploadSuccess = async (newDoc: DocumentMeta) => {
+    setDocuments((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
     setActiveDocId(newDoc.id);
     if (newDoc.biomarkers.length > 0) {
       setSelectedBiomarkerId(newDoc.biomarkers[0].id);
     }
-    setActiveTab('dual-pane');
-  };
 
-  // Handle Loading Complete Fictional Demo Patient
-  const handleLoadDemoPatient = () => {
-    setActivePatient(INITIAL_DEMO_PATIENT);
-    setDocuments(MOCK_DOCUMENTS);
-    setManagedDocs(INITIAL_DEMO_DOCUMENTS);
-    setActiveDocId('doc-quest-2024-01');
-    setSelectedBiomarkerId('bm-chol-2024');
-    setActiveTab('dashboard');
+    // Persist to document manager if a patient is active
+    if (activePatient) {
+      const managedDoc: ManagedDocument = {
+        id: newDoc.id,
+        patientId: activePatient.id,
+        filename: newDoc.title,
+        fileType: 'pdf',
+        fileSize: 1024 * 64,
+        documentCategory: 'Laboratory Report',
+        uploadTimestamp: new Date().toISOString(),
+        processingStatus: 'Processed',
+        extractionStatus: 'Extracted',
+        verificationStatus: newDoc.biomarkers.some((b) => b.verificationStatus === 'PENDING') ? 'Needs Verification' : 'Verified',
+        fileHash: `hash-${Date.now()}`,
+        previewSnippet: `Report from ${newDoc.labName} dated ${newDoc.reportDate}`,
+        linkedLabReportId: newDoc.id,
+      };
+      try {
+        await saveDocumentToPostgres(managedDoc);
+      } catch (err) {
+        console.warn('Postgres save document notice', err);
+      }
+      setManagedDocs((prev) => [managedDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
+    }
+
+    setActiveTab('dual-pane');
   };
 
   return (
     <div className="app-container">
-      {/* Global Header (White background, outline icons, preset selector, user toggle) */}
+      {/* Global Header */}
       <Header
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         userMode={userMode}
         onToggleUserMode={setUserMode}
-        activePresetId={activePresetId}
-        onSelectPreset={handleSelectPreset}
         onOpenUpload={() => setIsUploadOpen(true)}
-        onOpenJudgeTour={() => setIsJudgeTourOpen(true)}
         onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
         pendingReviewCount={pendingReviewCount}
-        onLoadDemoPatient={handleLoadDemoPatient}
+        activePatient={activePatient}
+        allPatients={patients}
+        onSelectPatient={(patientId) => {
+          const p = patients.find((pt) => pt.id === patientId);
+          if (p) handleSelectPatient(p);
+        }}
+        onAddPatient={() => {
+          setIsIntakeEditing(true);
+          setActiveTab('patient-intake');
+        }}
       />
 
       {/* Safety Notice Banner */}
@@ -275,11 +324,15 @@ export const App: React.FC = () => {
           pendingReviewCount={pendingReviewCount}
           onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
           activePatient={activePatient}
+          onAddPatient={() => {
+            setIsIntakeEditing(true);
+            setActiveTab('patient-intake');
+          }}
         />
 
         <main className="main-viewport">
-          {/* Document Selector Strip (when on Dual-Pane View) */}
-          {activeTab === 'dual-pane' && (
+          {/* Document Selector Strip (when on Dual-Pane View and documents exist) */}
+          {activeTab === 'dual-pane' && documents.length > 0 && activeDocument && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -326,9 +379,11 @@ export const App: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.78rem' }}>
-                <span style={{ color: '#64748B' }}>
-                  Patient: <strong style={{ color: '#334155' }}>{activePatient.name}</strong> ({activePatient.age}Y / {activePatient.sex})
-                </span>
+                {activePatient && (
+                  <span style={{ color: '#64748B' }}>
+                    Patient: <strong style={{ color: '#334155' }}>{activePatient.name}</strong> ({activePatient.age}Y / {activePatient.sex})
+                  </span>
+                )}
                 <span style={{ color: '#64748B' }}>
                   Accession: <code style={{ color: '#1E40AF', background: '#EFF6FF', padding: '0.15rem 0.4rem', borderRadius: '4px', border: '1px solid #BFDBFE' }}>{activeDocument.accessionNumber}</code>
                 </span>
@@ -340,15 +395,15 @@ export const App: React.FC = () => {
           {activeTab === 'dashboard' && (
             <DashboardView
               patient={activePatient}
+              patientCount={patients.length}
               documents={managedDocs}
-              records={FICTIONAL_DEMO_PATIENT.records}
+              records={[]}
               onNavigateTab={setActiveTab}
               onOpenUpload={() => setIsUploadOpen(true)}
               onAddPatient={() => {
                 setIsIntakeEditing(true);
                 setActiveTab('patient-intake');
               }}
-              onLoadDemoPatient={handleLoadDemoPatient}
             />
           )}
 
@@ -374,31 +429,73 @@ export const App: React.FC = () => {
 
           {/* Tab 1: Hero Dual-Pane Viewer */}
           {activeTab === 'dual-pane' && (
-            <div className="dual-pane-grid">
-              {/* Left Pane: Interactive Document Canvas & Bounding Boxes */}
-              <DocumentCanvas
-                document={activeDocument}
-                selectedBiomarkerId={selectedBiomarkerId}
-                onSelectBiomarker={handleSelectBiomarker}
-                userMode={userMode}
-              />
+            documents.length === 0 ? (
+              <div className="card" style={{ padding: '3.5rem 2rem', textAlign: 'center', maxWidth: '640px', margin: '3rem auto' }}>
+                <div style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '12px',
+                  background: '#EFF6FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1.25rem auto',
+                  color: '#2563EB',
+                }}>
+                  <FileText size={28} />
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1E293B', marginBottom: '0.5rem' }}>
+                  No Reports Extracted Yet
+                </h3>
+                <p style={{ color: '#64748B', fontSize: '0.875rem', lineHeight: 1.5, marginBottom: '1.75rem', maxWidth: '480px', margin: '0 auto 1.75rem auto' }}>
+                  Upload a clinical laboratory report or medical document to inspect extracted biomarkers, reference intervals, and exact coordinate provenance.
+                </p>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  <button onClick={() => setIsUploadOpen(true)} className="btn btn-primary">
+                    <UploadCloud size={16} />
+                    Upload Medical Report
+                  </button>
+                  {patients.length === 0 && (
+                    <button
+                      onClick={() => {
+                        setIsIntakeEditing(true);
+                        setActiveTab('patient-intake');
+                      }}
+                      className="btn btn-secondary"
+                    >
+                      <UserPlus size={16} />
+                      Add Patient First
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : activeDocument ? (
+              <div className="dual-pane-grid">
+                {/* Left Pane: Interactive Document Canvas & Bounding Boxes */}
+                <DocumentCanvas
+                  document={activeDocument}
+                  selectedBiomarkerId={selectedBiomarkerId}
+                  onSelectBiomarker={handleSelectBiomarker}
+                  userMode={userMode}
+                />
 
-              {/* Right Pane: Categorized Biomarkers, Reference Ranges & Context */}
-              <BiomarkerPanel
-                biomarkers={activeDocument.biomarkers}
-                selectedBiomarkerId={selectedBiomarkerId}
-                onSelectBiomarker={handleSelectBiomarker}
-                onOpenVerification={(bm) => setVerifyingBiomarker(bm)}
-                userMode={userMode}
-              />
-            </div>
+                {/* Right Pane: Categorized Biomarkers, Reference Ranges & Context */}
+                <BiomarkerPanel
+                  biomarkers={activeDocument.biomarkers}
+                  selectedBiomarkerId={selectedBiomarkerId}
+                  onSelectBiomarker={handleSelectBiomarker}
+                  onOpenVerification={(bm) => setVerifyingBiomarker(bm)}
+                  userMode={userMode}
+                />
+              </div>
+            ) : null
           )}
 
-          {/* Tab 2: Longitudinal Comparison & Conflict Matrix */}
+          {/* Tab 2: Longitudinal Comparison */}
           {activeTab === 'longitudinal' && (
             <LongitudinalComparison
               documents={documents}
-              conflicts={MOCK_CONFLICTS}
+              conflicts={[]}
               onSelectBiomarkerForProvenance={(docId, bmId) => {
                 setActiveDocId(docId);
                 setSelectedBiomarkerId(bmId);
@@ -421,7 +518,7 @@ export const App: React.FC = () => {
             <DoctorQuestions documents={documents} />
           )}
 
-          {/* Tab 5: Patient Intake & Profile (SOURCE = USER_PROVIDED in PostgreSQL) */}
+          {/* Tab 5: Patient Intake & Profile */}
           {activeTab === 'patient-intake' && (
             isIntakeEditing ? (
               <PatientIntakeForm
@@ -432,6 +529,16 @@ export const App: React.FC = () => {
             ) : (
               <PatientProfileView
                 patient={activePatient}
+                allPatients={patients}
+                onSelectPatient={(patientId) => {
+                  const p = patients.find((pt) => pt.id === patientId);
+                  if (p) handleSelectPatient(p);
+                }}
+                onAddPatient={() => {
+                  setActivePatient(null);
+                  setIsIntakeEditing(true);
+                }}
+                onDeletePatient={handleDeletePatient}
                 onEdit={() => setIsIntakeEditing(true)}
               />
             )
@@ -446,6 +553,10 @@ export const App: React.FC = () => {
               onDeleteDocument={handleDeleteDocument}
               onUpdateDocumentCategory={handleUpdateDocumentCategory}
               onOpenInDualPane={handleOpenInDualPane}
+              onAddPatient={() => {
+                setIsIntakeEditing(true);
+                setActiveTab('patient-intake');
+              }}
             />
           )}
         </main>
@@ -463,14 +574,6 @@ export const App: React.FC = () => {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onUploadSuccess={handleUploadSuccess}
-        availableSamples={documents}
-      />
-
-      <JudgeWalkthroughModal
-        isOpen={isJudgeTourOpen}
-        onClose={() => setIsJudgeTourOpen(false)}
-        onNavigateToTab={setActiveTab}
-        onSelectPreset={handleSelectPreset}
       />
 
       <SafetyModal

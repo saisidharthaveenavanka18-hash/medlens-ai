@@ -31,6 +31,9 @@ export const HitlQueueView: React.FC<HitlQueueViewProps> = ({
 
   const pendingItems = allBiomarkers.filter((item) => item.bm.verificationStatus === 'PENDING' || item.bm.confidence < 0.85);
   const verifiedItems = allBiomarkers.filter((item) => item.bm.verificationStatus === 'VERIFIED');
+  const avgConfidence = allBiomarkers.length > 0
+    ? ((allBiomarkers.reduce((acc, item) => acc + (item.bm.confidence || 0), 0) / allBiomarkers.length) * 100).toFixed(1) + '%'
+    : '0%';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '1080px', margin: '0 auto' }}>
@@ -74,6 +77,7 @@ export const HitlQueueView: React.FC<HitlQueueViewProps> = ({
             onClick={onBatchApproveHighConfidence}
             className="btn btn-secondary"
             style={{ fontSize: '0.8125rem', padding: '0.45rem 0.85rem' }}
+            disabled={allBiomarkers.length === 0}
           >
             <CheckCheck size={14} color="#166534" />
             Batch Verify High-Confidence (&gt;90%)
@@ -107,7 +111,7 @@ export const HitlQueueView: React.FC<HitlQueueViewProps> = ({
         <div className="card" style={{ padding: '1rem' }}>
           <span style={{ fontSize: '0.72rem', color: '#1E40AF', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>OCR Precision</span>
           <strong style={{ fontSize: '1.4rem', color: '#1E40AF' }}>
-            97.4%
+            {avgConfidence}
           </strong>
         </div>
       </div>
@@ -130,7 +134,15 @@ export const HitlQueueView: React.FC<HitlQueueViewProps> = ({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-          {pendingItems.length === 0 ? (
+          {allBiomarkers.length === 0 ? (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748B' }}>
+              <CheckCircle2 size={32} color="#94A3B8" style={{ margin: '0 auto 0.5rem auto' }} />
+              <h4 style={{ color: '#334155', fontSize: '0.925rem', margin: 0 }}>No extracted items yet</h4>
+              <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '0.25rem 0 0' }}>
+                Upload a medical report to inspect and verify OCR extractions.
+              </p>
+            </div>
+          ) : pendingItems.length === 0 ? (
             <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748B' }}>
               <CheckCircle2 size={32} color="#166534" style={{ margin: '0 auto 0.5rem auto' }} />
               <h4 style={{ color: '#334155', fontSize: '0.925rem', margin: 0 }}>All extracted items have been verified!</h4>

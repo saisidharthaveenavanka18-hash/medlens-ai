@@ -306,7 +306,7 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
             </label>
             <input
               type="text"
-              placeholder="e.g. Eleanor Vance"
+              placeholder="e.g. Patient Full Name"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);

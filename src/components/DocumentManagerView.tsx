@@ -550,7 +550,7 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
                   {/* Right: Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                     <button
-                      onClick={() => onOpenInDualPane(doc.linkedLabReportId || 'doc-quest-2024-01')}
+                      onClick={() => onOpenInDualPane(doc.linkedLabReportId || doc.id)}
                       className="btn btn-secondary"
                       style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
                       title="Open interactive report canvas with bounding box coordinates"

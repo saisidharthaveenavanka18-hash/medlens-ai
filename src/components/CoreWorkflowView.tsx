@@ -543,8 +543,7 @@ export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
                   </span>
                 </td>
               </tr>
-            ) : (
-              records.map((rec) => {
+            ) : records.map((rec) => {
               const isLowConfidence = rec.confidence < 0.7;
 
               return (

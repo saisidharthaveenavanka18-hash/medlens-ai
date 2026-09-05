@@ -116,6 +116,31 @@ export const LongitudinalComparison: React.FC<LongitudinalComparisonProps> = ({
         </div>
       </div>
 
+      {documents.length === 0 ? (
+        <div className="card" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', background: '#FFFFFF' }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: '#EFF6FF',
+            color: '#2563EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1rem auto',
+          }}>
+            <GitCompare size={24} />
+          </div>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1E293B', marginBottom: '0.4rem' }}>
+            No longitudinal data available
+          </h3>
+          <p style={{ fontSize: '0.8125rem', color: '#64748B', maxWidth: '440px', margin: '0 auto' }}>
+            Upload laboratory reports to track biomarker trends and compare assay values over time.
+          </p>
+        </div>
+      ) : (
+        <>
+
       {/* Cross-Lab Conflict Alerts Section */}
       {conflicts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -432,6 +457,8 @@ export const LongitudinalComparison: React.FC<LongitudinalComparisonProps> = ({
           </span>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

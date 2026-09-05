@@ -61,21 +61,42 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ documents }) => {
         </span>
       </div>
 
-      {/* Timeline Vertical Stack */}
-      <div style={{ position: 'relative', paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        
-        {/* Continuous timeline line */}
-        <div style={{
-          position: 'absolute',
-          top: '1rem',
-          bottom: '1rem',
-          left: '27px',
-          width: '2px',
-          background: '#E2E8F0',
-          zIndex: 0,
-        }} />
+      {sortedDocs.length === 0 ? (
+        <div className="card" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', background: '#FFFFFF' }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: '#EFF6FF',
+            color: '#2563EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1rem auto',
+          }}>
+            <Clock size={24} />
+          </div>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1E293B', marginBottom: '0.4rem' }}>
+            No timeline events yet
+          </h3>
+          <p style={{ fontSize: '0.8125rem', color: '#64748B', maxWidth: '420px', margin: '0 auto' }}>
+            Upload medical reports to build an interactive chronological health progression.
+          </p>
+        </div>
+      ) : (
+        <div style={{ position: 'relative', paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Continuous timeline line */}
+          <div style={{
+            position: 'absolute',
+            top: '1rem',
+            bottom: '1rem',
+            left: '27px',
+            width: '2px',
+            background: '#E2E8F0',
+            zIndex: 0,
+          }} />
 
-        {sortedDocs.map((doc, idx) => (
+          {sortedDocs.map((doc, idx) => (
           <div key={doc.id} style={{ position: 'relative', zIndex: 1 }}>
             
             {/* Step 1: Date Node */}
@@ -180,6 +201,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ documents }) => {
           </div>
         ))}
       </div>
+      )}
 
     </div>
   );

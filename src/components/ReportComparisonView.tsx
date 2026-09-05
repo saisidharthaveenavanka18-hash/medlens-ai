@@ -27,7 +27,7 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
   const reportB = documents.find((d) => d.id === reportBId) || documents[1] || documents[0];
 
   // Match laboratory tests between report A and report B by canonical name
-  const matchingTests = reportA.biomarkers.map((bmA) => {
+  const matchingTests = (reportA && reportB) ? reportA.biomarkers.map((bmA) => {
     const bmB = reportB.biomarkers.find((b) => b.canonicalName === bmA.canonicalName);
     
     let observedChange: string = 'N/A';
@@ -49,7 +49,7 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
       observedChange,
       numericDiff,
     };
-  });
+  }) : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '1100px', margin: '0 auto' }}>
@@ -94,15 +94,39 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
         </div>
       </div>
 
-      {/* Selectors Bar */}
-      <div className="card" style={{
-        padding: '1.15rem 1.25rem',
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center',
-        gap: '1rem',
-        background: '#FFFFFF',
-      }}>
+      {documents.length < 2 ? (
+        <div className="card" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', background: '#FFFFFF' }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: '#EFF6FF',
+            color: '#2563EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1rem auto',
+          }}>
+            <GitCompare size={24} />
+          </div>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1E293B', marginBottom: '0.4rem' }}>
+            At least two reports required for comparison
+          </h3>
+          <p style={{ fontSize: '0.8125rem', color: '#64748B', maxWidth: '440px', margin: '0 auto' }}>
+            Upload two or more laboratory reports to view side-by-side numerical differences and trend comparisons.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Selectors Bar */}
+          <div className="card" style={{
+            padding: '1.15rem 1.25rem',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            gap: '1rem',
+            background: '#FFFFFF',
+          }}>
         {/* Previous Report Selector */}
         <div>
           <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
@@ -249,6 +273,8 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
           <strong>Clinical Safety Guideline:</strong> Only observed numerical changes are shown. MedLens does not medically interpret variations or infer clinical conditions from delta values.
         </span>
       </div>
+      </>
+      )}
 
     </div>
   );

@@ -55,28 +55,35 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         id: r.id || `bm-${Date.now()}-${idx}`,
         canonicalName: r.testName,
         rawLabel: r.testName,
-        category: 'Laboratory',
+        category: 'Other',
         numericValue: r.numericValue,
         rawValue: r.value,
         unit: r.unit,
         standardizedUnit: r.unit,
+        standardizedValue: r.numericValue,
         referenceRange: {
           rawText: r.referenceRangeText,
           lower: r.rangeLower,
           upper: r.rangeUpper,
-          isSpecifiedInReport: r.hasReferenceRange,
+          unit: r.unit,
+          isMissingInReport: !r.hasReferenceRange,
+          sourceCitation: `Extracted from token: "${r.referenceRangeText || 'Not specified'}"`,
         },
-        status: r.status,
+        provenance: {
+          page: r.pageNumber || 1,
+          bbox: [40 + idx * 8, 20, 45 + idx * 8, 80],
+          snippet: `${r.testName}: ${r.value} ${r.unit} (Ref: ${r.referenceRangeText || 'N/A'})`,
+          confidence: r.confidence,
+        },
+        status: (r.status === 'REFERENCE RANGE UNAVAILABLE' ? 'UNSPECIFIED' : r.status) as any,
         confidence: r.confidence,
-        boundingBox: {
-          x: 20,
-          y: 40 + idx * 8,
-          width: 60,
-          height: 5,
-        },
-        pageNumber: r.pageNumber || 1,
         verificationStatus: r.isHumanVerified ? 'VERIFIED' : 'PENDING',
         auditHistory: [],
+        educationalNote: `Clinical test: ${r.testName}. Consult healthcare provider for diagnosis.`,
+        clinicalQuestions: [
+          `What are the clinical implications of my ${r.testName} measurement (${r.value} ${r.unit})?`,
+          `Is any repeat or follow-up testing recommended?`
+        ],
       }));
 
       const newDoc: DocumentMeta = {

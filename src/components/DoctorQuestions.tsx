@@ -12,7 +12,7 @@ import {
   Activity,
   Info
 } from 'lucide-react';
-import { DocumentMeta } from '../types';
+import { DocumentMeta, BiomarkerRecord } from '../types';
 
 interface DoctorQuestionsProps {
   documents: DocumentMeta[];
@@ -22,85 +22,59 @@ export const DoctorQuestions: React.FC<DoctorQuestionsProps> = ({ documents }) =
   const [copied, setCopied] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
 
-  // Clinically safe findings grounded strictly in uploaded reports
-  const keyFindings = [
-    {
-      title: 'Lipid Trajectory Improvement',
-      desc: 'Total Cholesterol decreased from 228 mg/dL to 185 mg/dL; LDL dropped from 142 mg/dL to 104 mg/dL over a 12-month interval.',
-      status: 'improving',
-    },
-    {
-      title: 'Fasting Blood Glucose Elevation',
-      desc: 'Fasting glucose shows sequential elevation: 94 mg/dL (Jan 2024) → 104 mg/dL (Jun 2024) → 112 mg/dL (Feb 2025).',
-      status: 'monitor',
-    },
-    {
-      title: 'Vitamin D Mild Insufficiency',
-      desc: '25-Hydroxy Vitamin D measured at 24 ng/mL against laboratory reference threshold of 30–100 ng/mL.',
-      status: 'attention',
-    },
-  ];
+  // Dynamically aggregate all biomarkers across uploaded documents
+  const allBiomarkers: { doc: DocumentMeta; bm: BiomarkerRecord }[] = [];
+  documents.forEach((doc) => {
+    doc.biomarkers.forEach((bm) => {
+      allBiomarkers.push({ doc, bm });
+    });
+  });
 
-  const abnormalities = [
-    {
-      marker: 'Fasting Blood Glucose',
-      current: '112 mg/dL',
-      range: '70 - 99 mg/dL',
-      flag: 'High',
-      flagType: 'warning',
-      lab: 'Quest Diagnostics (Feb 2025)',
-    },
-    {
-      marker: 'Vitamin D, 25-Hydroxy',
-      current: '24 ng/mL',
-      range: '30 - 100 ng/mL',
-      flag: 'Low',
-      flagType: 'warning',
-      lab: 'Quest Diagnostics (Feb 2025)',
-    },
-    {
-      marker: 'AST (Aspartate Aminotransferase)',
-      current: '36 U/L',
-      range: '10 - 33 U/L (Labcorp)',
-      flag: 'Slightly High',
-      flagType: 'warning',
-      lab: 'Labcorp (Jun 2024)',
-    },
-  ];
+  const abnormalItems = allBiomarkers.filter(
+    (item) => item.bm.status === 'LOW' || item.bm.status === 'HIGH' || item.bm.referenceRange.isMissingInReport
+  );
 
-  // Synthesize clinically safe questions grounded strictly in the uploaded reports
-  const synthesizedQuestions = [
-    {
-      topic: 'Metabolic & Glycemic Trajectory',
-      marker: 'Fasting Blood Glucose',
-      question: 'My fasting blood sugar has shown an upward trend across my recent lab tests (94 mg/dL in Jan 2024, 104 mg/dL in Jun 2024, and 112 mg/dL in Feb 2025). Would you recommend ordering an HbA1c test or scheduling follow-up blood work to monitor my average glycemic control?',
-      rationale: 'Addresses the consistent +19% increase without asserting diabetes.',
-    },
-    {
-      topic: 'Lipid Profile & Cardiovascular Progression',
-      marker: 'Total Cholesterol & LDL',
-      question: 'My Total Cholesterol decreased from 228 mg/dL to 185 mg/dL over the past year, and LDL improved from 142 to 104 mg/dL. Are my current nutritional and lifestyle habits sufficient to maintain this trend, and when should we re-test?',
-      rationale: 'Focuses on maintaining positive lifestyle modifications.',
-    },
-    {
-      topic: 'Cross-Laboratory Reference Range Variance',
-      marker: 'AST (Aspartate Aminotransferase)',
-      question: 'I noticed that Quest Diagnostics and Labcorp have different normal reference intervals for AST (Quest normal up to 40 U/L, Labcorp up to 33 U/L). My result was 36 U/L. How do you interpret this minor assay difference in my overall liver health?',
-      rationale: 'Educates the patient on differing lab assay benchmarks.',
-    },
-    {
-      topic: 'Report Interval Omission',
-      marker: 'hs-CRP (High-Sensitivity C-Reactive Protein)',
-      question: 'On my recent hospital outpatient report, hs-CRP was 1.8 mg/L, but no reference range was printed by the testing lab. How does your practice clinically evaluate this measurement within my cardiovascular profile?',
-      rationale: 'Directly addresses unprinted reference intervals without guessing.',
-    },
-    {
-      topic: 'Vitamin D Sufficiency',
-      marker: '25-Hydroxy Vitamin D',
-      question: 'My recent test showed Vitamin D at 24 ng/mL, with the lab designating 30–100 ng/mL as the normal range. Do you recommend dietary adjustments, safe sunlight exposure, or targeted supplementation?',
-      rationale: 'Constructive discussion prompt for mild insufficiency.',
-    },
-  ];
+  // Clinically safe findings grounded strictly in actual uploaded reports
+  const keyFindings = abnormalItems.slice(0, 3).map((item) => ({
+    title: `${item.bm.canonicalName} (${item.bm.status})`,
+    desc: `${item.bm.canonicalName} was measured at ${item.bm.rawValue} ${item.bm.unit} (Printed Ref: ${item.bm.referenceRange.rawText}) in ${item.doc.labName} on ${item.doc.reportDate}.`,
+    status: item.bm.status === 'HIGH' ? 'monitor' : item.bm.status === 'LOW' ? 'attention' : 'improving',
+  }));
+
+  const abnormalities = abnormalItems.map((item) => ({
+    marker: item.bm.canonicalName,
+    current: `${item.bm.rawValue} ${item.bm.unit}`,
+    range: item.bm.referenceRange.rawText,
+    flag: item.bm.status === 'HIGH' ? 'High' : item.bm.status === 'LOW' ? 'Low' : 'Range Unavailable',
+    flagType: item.bm.status === 'HIGH' || item.bm.status === 'LOW' ? 'warning' : 'info',
+    lab: `${item.doc.labName} (${item.doc.reportDate})`,
+  }));
+
+  // Synthesize clinically safe discussion questions grounded strictly in the actual tests
+  const synthesizedQuestions = abnormalItems.map((item) => {
+    if (item.bm.status === 'HIGH') {
+      return {
+        topic: `${item.bm.category || 'Laboratory'} Trajectory`,
+        marker: item.bm.canonicalName,
+        question: `My test for ${item.bm.canonicalName} measured ${item.bm.rawValue} ${item.bm.unit}, which is above the printed lab interval (${item.bm.referenceRange.rawText}). What follow-up steps or lifestyle adjustments do you recommend to monitor this?`,
+        rationale: `Directly questions elevated ${item.bm.canonicalName} without guessing underlying pathology.`,
+      };
+    } else if (item.bm.status === 'LOW') {
+      return {
+        topic: `${item.bm.category || 'Nutritional/Metabolic'} Evaluation`,
+        marker: item.bm.canonicalName,
+        question: `My recent test showed ${item.bm.canonicalName} at ${item.bm.rawValue} ${item.bm.unit}, below the normal reference range (${item.bm.referenceRange.rawText}). Do you advise dietary changes, lifestyle modification, or supplementation?`,
+        rationale: `Constructive discussion prompt for below-reference result.`,
+      };
+    } else {
+      return {
+        topic: 'Reference Interval Clarification',
+        marker: item.bm.canonicalName,
+        question: `On my report from ${item.doc.labName}, ${item.bm.canonicalName} was measured at ${item.bm.rawValue} ${item.bm.unit}, but no reference range was printed. How does your practice clinically evaluate this measurement?`,
+        rationale: `Addresses unprinted laboratory intervals responsibly.`,
+      };
+    }
+  });
 
   const handleCopy = () => {
     const text = synthesizedQuestions
