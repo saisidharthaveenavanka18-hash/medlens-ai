@@ -116,7 +116,6 @@ export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
         ...prev,
       ]);
 
-      setIsDemoActive(extractionResult.isDemoFallback);
       setUploadSuccessMessage(`Successfully extracted ${extractionResult.records.length} structured laboratory tests from ${file.name}.`);
       setTimeout(() => setUploadSuccessMessage(null), 5000);
     } catch (err) {
