@@ -298,20 +298,6 @@ export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
               <h2 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1E3A8A', margin: 0 }}>
                 Clinical Document Extraction &amp; Verification Pipeline
               </h2>
-              {isDemoActive && (
-                <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: '#92400E',
-                  background: '#FFFBEB',
-                  border: '1px solid #FDE68A',
-                  padding: '0.15rem 0.55rem',
-                  borderRadius: '4px',
-                  letterSpacing: '0.04em',
-                }}>
-                  DEMO DATA — FICTIONAL
-                </span>
-              )}
             </div>
             <p style={{ fontSize: '0.8125rem', color: '#1E40AF', margin: '0.2rem 0 0' }}>
               UPLOAD &rarr; EXTRACT &rarr; STRUCTURE &rarr; REFERENCE RANGE &rarr; PROVENANCE &rarr; REVIEW
@@ -319,20 +305,29 @@ export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
           </div>
         </div>
 
-        {/* Prominent "Load Demo Patient" Button */}
+        {/* Action Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {onAddPatient && (
+            <button
+              onClick={onAddPatient}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8125rem', padding: '0.45rem 0.85rem' }}
+            >
+              <UserCheck size={14} />
+              + Add Patient
+            </button>
+          )}
           <button
-            onClick={handleLoadDemoPatient}
+            onClick={() => fileInputRef.current?.click()}
             className="btn btn-primary"
             style={{
-              padding: '0.55rem 1.15rem',
-              fontSize: '0.875rem',
+              padding: '0.45rem 0.85rem',
+              fontSize: '0.8125rem',
               fontWeight: 600,
-              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
             }}
           >
-            <Sparkles size={16} />
-            Load Demo Patient
+            <UploadCloud size={14} />
+            Select Document
           </button>
         </div>
       </div>
@@ -536,7 +531,20 @@ export const CoreWorkflowView: React.FC<CoreWorkflowViewProps> = ({
             </tr>
           </thead>
           <tbody>
-            {records.map((rec) => {
+            {records.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94A3B8' }}>
+                  <FileCheck size={32} style={{ margin: '0 auto 0.5rem auto', opacity: 0.4 }} />
+                  <p style={{ margin: '0 0 0.25rem 0', fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>
+                    No structured laboratory tests extracted yet
+                  </p>
+                  <span style={{ fontSize: '0.78rem' }}>
+                    Upload a medical report above to extract, structure, and verify clinical laboratory results.
+                  </span>
+                </td>
+              </tr>
+            ) : (
+              records.map((rec) => {
               const isLowConfidence = rec.confidence < 0.7;
 
               return (
