@@ -78,27 +78,27 @@ export const Header: React.FC<HeaderProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
               <span style={{ 
                 fontFamily: 'var(--font-sans)', 
-                fontSize: '1.1rem', 
-                fontWeight: 600, 
+                fontSize: '1.15rem', 
+                fontWeight: 700, 
                 color: 'var(--text-main)',
-                letterSpacing: '-0.01em',
+                letterSpacing: '-0.015em',
               }}>
                 MedLens
               </span>
               <span style={{
-                fontSize: '0.65rem',
-                fontWeight: 500,
-                backgroundColor: '#EFF6FF',
-                color: '#1E40AF',
-                border: '1px solid #DBEAFE',
-                padding: '0.1rem 0.35rem',
+                fontSize: '0.675rem',
+                fontWeight: 600,
+                backgroundColor: '#F0F9FF',
+                color: '#0369A1',
+                border: '1px solid #BAE6FD',
+                padding: '0.1rem 0.4rem',
                 borderRadius: '4px',
               }}>
                 Clinical Intelligence
               </span>
             </div>
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.1, margin: 0 }}>
-              AI Clinical Information Intelligence
+            <p style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', lineHeight: 1.1, margin: 0 }}>
+              Organize medical information and review it intelligently.
             </p>
           </div>
         </div>

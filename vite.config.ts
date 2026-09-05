@@ -5,6 +5,12 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react()],
   cacheDir: 'C:/Users/JASHWANTH/.vite_cache/medilanes',
+  server: {
+    host: true,
+    port: 5173,
+    cors: true,
+    allowedHosts: true,
+  },
   optimizeDeps: {
     exclude: ['@electric-sql/pglite'],
   },

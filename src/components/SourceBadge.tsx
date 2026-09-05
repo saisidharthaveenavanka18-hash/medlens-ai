@@ -17,22 +17,31 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({
 
   const badgeConfigs = {
     USER_PROVIDED: {
-      label: 'Patient Provided',
-      internalKey: 'SOURCE = USER_PROVIDED',
+      label: 'Entered by user',
+      internalKey: 'Entered by user',
       icon: <User size={isSm ? 10 : 12} />,
       color: '#065f46',
       bg: '#ecfdf5',
       border: '1px solid #a7f3d0',
-      tooltip: 'Self-reported by patient during clinical intake form (Unverified history)',
+      tooltip: 'Information entered directly by the user',
     },
-    AI_EXTRACTED: {
-      label: 'Extracted from Report',
-      internalKey: 'SOURCE = AI_EXTRACTED',
+    DOCUMENT_EXTRACTED: {
+      label: 'Extracted from document',
+      internalKey: 'Extracted from document',
       icon: <Zap size={isSm ? 10 : 12} />,
       color: '#1e40af',
       bg: '#eff6ff',
       border: '1px solid #bfdbfe',
-      tooltip: 'Extracted directly from laboratory document using vector stream & OCR',
+      tooltip: 'Extracted from uploaded medical document',
+    },
+    AI_EXTRACTED: {
+      label: 'Extracted from document',
+      internalKey: 'Extracted from document',
+      icon: <Zap size={isSm ? 10 : 12} />,
+      color: '#1e40af',
+      bg: '#eff6ff',
+      border: '1px solid #bfdbfe',
+      tooltip: 'Extracted from uploaded medical document',
     },
     AI_GENERATED: {
       label: 'AI-Generated',

@@ -6,6 +6,10 @@ export type UserMode = 'patient' | 'clinician';
 
 export type NavigationTab = 
   | 'dashboard'
+  | 'patients'
+  | 'reports'
+  | 'ai-assistant'
+  | 'settings'
   | 'workflow'
   | 'dual-pane' 
   | 'comparison'
@@ -58,16 +62,26 @@ export interface ManagedDocument {
 
 export type SourceLabel = 
   | 'USER_PROVIDED'
+  | 'DOCUMENT_EXTRACTED'
   | 'AI_EXTRACTED'
   | 'AI_GENERATED'
   | 'HUMAN_VERIFIED';
+
+export interface PatientConflict {
+  id: string;
+  field: string;
+  userValue: string;
+  documentValue: string;
+  sourceDocName: string;
+  resolved?: boolean;
+}
 
 export interface PatientSymptom {
   id: string;
   name: string;
   severity: 'Mild' | 'Moderate' | 'Severe';
   duration?: string;
-  source: 'USER_PROVIDED';
+  source?: 'USER_PROVIDED' | 'DOCUMENT_EXTRACTED' | SourceLabel;
 }
 
 export interface PatientCondition {
@@ -75,7 +89,7 @@ export interface PatientCondition {
   name: string;
   status: 'Active' | 'Managed' | 'In Remission';
   diagnosedYear?: string;
-  source: 'USER_PROVIDED';
+  source?: 'USER_PROVIDED' | 'DOCUMENT_EXTRACTED' | SourceLabel;
 }
 
 export interface PatientAllergy {
@@ -83,7 +97,7 @@ export interface PatientAllergy {
   allergen: string;
   reaction: string;
   severity: 'Mild' | 'Moderate' | 'Severe' | 'Anaphylactic';
-  source: 'USER_PROVIDED';
+  source?: 'USER_PROVIDED' | 'DOCUMENT_EXTRACTED' | SourceLabel;
 }
 
 export interface PatientMedication {
@@ -92,7 +106,7 @@ export interface PatientMedication {
   dosage: string;
   frequency: string;
   purpose?: string;
-  source: 'USER_PROVIDED';
+  source?: 'USER_PROVIDED' | 'DOCUMENT_EXTRACTED' | SourceLabel;
 }
 
 export interface PatientRecord {
@@ -100,15 +114,67 @@ export interface PatientRecord {
   name: string;
   age: number;
   sex: 'Male' | 'Female' | 'Intersex' | 'Other' | 'Prefer not to say';
+  bloodGroup?: string;
   symptoms: PatientSymptom[];
   conditions: PatientCondition[];
   allergies: PatientAllergy[];
   medications: PatientMedication[];
   medicalHistory: string;
   additionalNotes: string;
-  source: 'USER_PROVIDED';
+  source?: 'USER_PROVIDED' | 'DOCUMENT_EXTRACTED' | 'COMBINED' | SourceLabel;
+  conflicts?: PatientConflict[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StructuredExtraction {
+  id: string;
+  documentId: string;
+  patientName?: string;
+  patientAge?: string;
+  patientSex?: string;
+  reportDate?: string;
+  symptoms: string[];
+  conditions: string[];
+  allergies: string[];
+  medications: string[];
+  laboratoryResults: {
+    name: string;
+    value: string;
+    numericValue: number | null;
+    unit: string;
+    referenceRange: string;
+    rangeLower: number | null;
+    rangeUpper: number | null;
+    hasReferenceRange: boolean;
+    status: 'NORMAL' | 'LOW' | 'HIGH' | 'REFERENCE RANGE UNAVAILABLE';
+    observation?: string;
+  }[];
+  clinicalObservations: string[];
+  missingFields: string[];
+  sourceDocument: string;
+  pageNumber?: number;
+  extractedAt: string;
+  isHumanVerified?: boolean;
+}
+
+export interface AiAssistedSummary {
+  patientOverview: string;
+  keyFindings: string[];
+  laboratoryResults: {
+    testName: string;
+    value: string;
+    unit: string;
+    range: string;
+    status: string;
+    sourceCitation: string;
+  }[];
+  medications: string[];
+  importantObservations: string[];
+  missingOrUnclearInfo: string[];
+  sourceCitations: { docTitle: string; page?: number }[];
+  generatedAt: string;
+  disclaimer: string;
 }
 
 export interface ReferenceRange {
@@ -172,6 +238,15 @@ export interface DocumentMeta {
   overallConfidence: number;
   biomarkers: BiomarkerRecord[];
   paperTheme?: 'clean' | 'scan' | 'fax';
+  extractedPatientName?: string;
+  extractedAge?: number;
+  extractedSex?: 'Male' | 'Female' | 'Intersex' | 'Other' | 'Prefer not to say';
+  extractedBloodGroup?: string;
+  extractedMedications?: string[];
+  extractedConditions?: string[];
+  extractedSymptoms?: string[];
+  extractedAllergies?: string[];
+  structuredData?: StructuredExtraction;
 }
 
 export interface ConflictRecord {

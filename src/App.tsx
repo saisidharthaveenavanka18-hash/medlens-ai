@@ -7,7 +7,8 @@ import {
   VerificationAudit,
   PatientRecord,
   ManagedDocument,
-  DocumentCategory
+  DocumentCategory,
+  PatientConflict
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -24,6 +25,9 @@ import { PatientProfileView } from './components/PatientProfileView';
 import { DocumentManagerView } from './components/DocumentManagerView';
 import { CoreWorkflowView } from './components/CoreWorkflowView';
 import { DashboardView } from './components/DashboardView';
+import { ReportsView } from './components/ReportsView';
+import { AskMedLensView } from './components/AskMedLensView';
+import { SettingsView } from './components/SettingsView';
 import { ReportComparisonView } from './components/ReportComparisonView';
 import { TimelineView } from './components/TimelineView';
 import { 
@@ -35,7 +39,8 @@ import {
   saveDocumentToPostgres,
   getDocumentsByPatientFromPostgres,
   deleteDocumentFromPostgres,
-  updateDocumentStatusInPostgres
+  updateDocumentStatusInPostgres,
+  clearAllPostgresData
 } from './services/db';
 import { FileText, UploadCloud, UserPlus } from 'lucide-react';
 
@@ -47,6 +52,7 @@ export const App: React.FC = () => {
   const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [activePatient, setActivePatient] = useState<PatientRecord | null>(null);
   const [isIntakeEditing, setIsIntakeEditing] = useState<boolean>(false);
+  const [saveSuccessNotification, setSaveSuccessNotification] = useState<boolean>(false);
 
   // Real Documents state - starts empty
   const [documents, setDocuments] = useState<DocumentMeta[]>([]);
@@ -139,8 +145,10 @@ export const App: React.FC = () => {
     });
     setActivePatient(patient);
     localStorage.setItem('medlens_active_patient_id', patient.id);
+    setSaveSuccessNotification(true);
+    setTimeout(() => setSaveSuccessNotification(false), 8000);
     setIsIntakeEditing(false);
-    setActiveTab('patient-intake');
+    setActiveTab('patients');
   };
 
   // Delete Patient and associated records
@@ -254,40 +262,231 @@ export const App: React.FC = () => {
     );
   };
 
-  // Handle Upload Success from Modal
-  const handleUploadSuccess = async (newDoc: DocumentMeta) => {
-    setDocuments((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
-    setActiveDocId(newDoc.id);
-    if (newDoc.biomarkers.length > 0) {
-      setSelectedBiomarkerId(newDoc.biomarkers[0].id);
-    }
+  // Resolve conflicting fields between user input and uploaded document
+  const handleResolveConflict = async (conflictId: string, choice: 'user' | 'document') => {
+    if (!activePatient || !activePatient.conflicts) return;
+    const conflict = activePatient.conflicts.find((c) => c.id === conflictId);
+    if (!conflict) return;
 
-    // Persist to document manager if a patient is active
-    if (activePatient) {
-      const managedDoc: ManagedDocument = {
-        id: newDoc.id,
-        patientId: activePatient.id,
-        filename: newDoc.title,
-        fileType: 'pdf',
-        fileSize: 1024 * 64,
-        documentCategory: 'Laboratory Report',
-        uploadTimestamp: new Date().toISOString(),
-        processingStatus: 'Processed',
-        extractionStatus: 'Extracted',
-        verificationStatus: newDoc.biomarkers.some((b) => b.verificationStatus === 'PENDING') ? 'Needs Verification' : 'Verified',
-        fileHash: `hash-${Date.now()}`,
-        previewSnippet: `Report from ${newDoc.labName} dated ${newDoc.reportDate}`,
-        linkedLabReportId: newDoc.id,
-      };
-      try {
-        await saveDocumentToPostgres(managedDoc);
-      } catch (err) {
-        console.warn('Postgres save document notice', err);
+    const updatedPatient: PatientRecord = { ...activePatient };
+    if (choice === 'document') {
+      if (conflict.field === 'Age') {
+        const num = parseInt(conflict.documentValue, 10);
+        if (!isNaN(num)) updatedPatient.age = num;
+      } else if (conflict.field === 'Biological Sex') {
+        updatedPatient.sex = conflict.documentValue as any;
+      } else if (conflict.field === 'Blood Group') {
+        updatedPatient.bloodGroup = conflict.documentValue;
       }
-      setManagedDocs((prev) => [managedDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
+    }
+    updatedPatient.conflicts = (updatedPatient.conflicts || []).filter((c) => c.id !== conflictId);
+    updatedPatient.updatedAt = new Date().toISOString();
+
+    await savePatientToPostgres(updatedPatient);
+    setActivePatient(updatedPatient);
+    setPatients((prev) => prev.map((p) => (p.id === updatedPatient.id ? updatedPatient : p)));
+  };
+
+  // Handle Upload Success from Modal or Reports View (Combines data, tracks conflicts, auto-initializes patient)
+  const handleUploadSuccess = async (newDoc: DocumentMeta) => {
+    let targetPatient = activePatient;
+
+    // PATH B: If no patient is active, auto-initialize patient from extracted document details
+    if (!targetPatient) {
+      const patientName = newDoc.extractedPatientName || newDoc.title.replace(/\.[^/.]+$/, '') || 'Patient (Uploaded Record)';
+      const patientAge = newDoc.extractedAge || 45;
+      const patientSex = newDoc.extractedSex || 'Male';
+
+      const newPatient: PatientRecord = {
+        id: `pt-${Date.now()}`,
+        name: patientName,
+        age: patientAge,
+        sex: patientSex,
+        bloodGroup: newDoc.extractedBloodGroup || undefined,
+        symptoms: (newDoc.extractedSymptoms || []).map((s, idx) => ({
+          id: `sym-ext-${Date.now()}-${idx}`,
+          name: s,
+          severity: 'Moderate',
+          source: 'DOCUMENT_EXTRACTED',
+        })),
+        conditions: (newDoc.extractedConditions || []).map((c, idx) => ({
+          id: `cnd-ext-${Date.now()}-${idx}`,
+          name: c,
+          status: 'Active',
+          source: 'DOCUMENT_EXTRACTED',
+        })),
+        allergies: (newDoc.extractedAllergies || []).map((a, idx) => ({
+          id: `alg-ext-${Date.now()}-${idx}`,
+          allergen: a,
+          reaction: 'Documented in medical report',
+          severity: 'Moderate',
+          source: 'DOCUMENT_EXTRACTED',
+        })),
+        medications: (newDoc.extractedMedications || []).map((m, idx) => ({
+          id: `med-ext-${Date.now()}-${idx}`,
+          name: m,
+          dosage: 'As prescribed in report',
+          frequency: 'Daily',
+          source: 'DOCUMENT_EXTRACTED',
+        })),
+        medicalHistory: `Information extracted from medical document: ${newDoc.title}`,
+        additionalNotes: '',
+        source: 'DOCUMENT_EXTRACTED',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await savePatientToPostgres(newPatient);
+      } catch (err) {
+        console.warn('Postgres patient save notice', err);
+      }
+
+      setPatients((prev) => [newPatient, ...prev]);
+      setActivePatient(newPatient);
+      localStorage.setItem('medlens_active_patient_id', newPatient.id);
+      targetPatient = newPatient;
+    } else {
+      // MANUAL + UPLOAD DATA COMBINATION
+      // Check for conflicts between user-entered info and document-extracted info
+      const conflicts: PatientConflict[] = targetPatient.conflicts ? [...targetPatient.conflicts] : [];
+
+      if (newDoc.extractedAge && newDoc.extractedAge !== targetPatient.age) {
+        if (!conflicts.some((c) => c.field === 'Age')) {
+          conflicts.push({
+            id: `conf-age-${Date.now()}`,
+            field: 'Age',
+            userValue: `${targetPatient.age} years`,
+            documentValue: `${newDoc.extractedAge} years`,
+            sourceDocName: newDoc.title,
+          });
+        }
+      }
+
+      if (newDoc.extractedSex && newDoc.extractedSex !== targetPatient.sex) {
+        if (!conflicts.some((c) => c.field === 'Biological Sex')) {
+          conflicts.push({
+            id: `conf-sex-${Date.now()}`,
+            field: 'Biological Sex',
+            userValue: targetPatient.sex,
+            documentValue: newDoc.extractedSex,
+            sourceDocName: newDoc.title,
+          });
+        }
+      }
+
+      if (newDoc.extractedBloodGroup && targetPatient.bloodGroup && newDoc.extractedBloodGroup !== targetPatient.bloodGroup) {
+        if (!conflicts.some((c) => c.field === 'Blood Group')) {
+          conflicts.push({
+            id: `conf-bg-${Date.now()}`,
+            field: 'Blood Group',
+            userValue: targetPatient.bloodGroup,
+            documentValue: newDoc.extractedBloodGroup,
+            sourceDocName: newDoc.title,
+          });
+        }
+      }
+
+      // Merge extracted medications without duplicating
+      const existingMeds = new Set(targetPatient.medications.map((m) => m.name.toLowerCase()));
+      const combinedMeds = [...targetPatient.medications];
+      (newDoc.extractedMedications || []).forEach((med, idx) => {
+        if (!existingMeds.has(med.toLowerCase())) {
+          combinedMeds.push({
+            id: `med-doc-${Date.now()}-${idx}`,
+            name: med,
+            dosage: 'Per report notes',
+            frequency: 'Daily',
+            source: 'DOCUMENT_EXTRACTED',
+          });
+        }
+      });
+
+      // Merge extracted conditions without duplicating
+      const existingConditions = new Set(targetPatient.conditions.map((c) => c.name.toLowerCase()));
+      const combinedConditions = [...targetPatient.conditions];
+      (newDoc.extractedConditions || []).forEach((cnd, idx) => {
+        if (!existingConditions.has(cnd.toLowerCase())) {
+          combinedConditions.push({
+            id: `cnd-doc-${Date.now()}-${idx}`,
+            name: cnd,
+            status: 'Active',
+            source: 'DOCUMENT_EXTRACTED',
+          });
+        }
+      });
+
+      // Merge extracted allergies without duplicating
+      const existingAllergies = new Set(targetPatient.allergies.map((a) => a.allergen.toLowerCase()));
+      const combinedAllergies = [...targetPatient.allergies];
+      (newDoc.extractedAllergies || []).forEach((alg, idx) => {
+        if (!existingAllergies.has(alg.toLowerCase())) {
+          combinedAllergies.push({
+            id: `alg-doc-${Date.now()}-${idx}`,
+            allergen: alg,
+            reaction: 'Extracted from document',
+            severity: 'Moderate',
+            source: 'DOCUMENT_EXTRACTED',
+          });
+        }
+      });
+
+      const updatedPatient: PatientRecord = {
+        ...targetPatient,
+        medications: combinedMeds,
+        conditions: combinedConditions,
+        allergies: combinedAllergies,
+        conflicts,
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await savePatientToPostgres(updatedPatient);
+      } catch (err) {
+        console.warn('Postgres patient update notice', err);
+      }
+
+      targetPatient = updatedPatient;
+      setActivePatient(updatedPatient);
+      setPatients((prev) => prev.map((p) => (p.id === updatedPatient.id ? updatedPatient : p)));
     }
 
-    setActiveTab('dual-pane');
+    const docWithPatient: DocumentMeta = {
+      ...newDoc,
+      patientIdentifier: targetPatient.id,
+    };
+
+    setDocuments((prev) => [docWithPatient, ...prev.filter((d) => d.id !== docWithPatient.id)]);
+    setActiveDocId(docWithPatient.id);
+    if (docWithPatient.biomarkers.length > 0) {
+      setSelectedBiomarkerId(docWithPatient.biomarkers[0].id);
+    }
+
+    // Persist document to PostgreSQL
+    const managedDoc: ManagedDocument = {
+      id: docWithPatient.id,
+      patientId: targetPatient.id,
+      filename: docWithPatient.title,
+      fileType: 'pdf',
+      fileSize: 1024 * 64,
+      documentCategory: 'Laboratory Report',
+      uploadTimestamp: new Date().toISOString(),
+      processingStatus: 'Processed',
+      extractionStatus: 'Extracted',
+      verificationStatus: docWithPatient.biomarkers.some((b) => b.verificationStatus === 'PENDING') ? 'Needs Verification' : 'Verified',
+      fileHash: `hash-${Date.now()}`,
+      previewSnippet: `Report from ${docWithPatient.labName} dated ${docWithPatient.reportDate}`,
+      linkedLabReportId: docWithPatient.id,
+    };
+    try {
+      await saveDocumentToPostgres(managedDoc);
+    } catch (err) {
+      console.warn('Postgres save document notice', err);
+    }
+    setManagedDocs((prev) => [managedDoc, ...prev.filter((d) => d.id !== docWithPatient.id)]);
+
+    // Directly route to Patient Profile to see the unified structured output!
+    setActiveTab('patients');
   };
 
   return (
@@ -391,135 +590,26 @@ export const App: React.FC = () => {
             </div>
           )}
 
-          {/* Tab: Integrated High-Value Dashboard */}
+          {/* Tab 1: Dashboard */}
           {activeTab === 'dashboard' && (
             <DashboardView
               patient={activePatient}
+              allPatients={patients}
               patientCount={patients.length}
               documents={managedDocs}
-              records={[]}
+              labDocuments={documents}
               onNavigateTab={setActiveTab}
               onOpenUpload={() => setIsUploadOpen(true)}
               onAddPatient={() => {
                 setIsIntakeEditing(true);
-                setActiveTab('patient-intake');
+                setActiveTab('patients');
               }}
+              onSelectPatient={handleSelectPatient}
             />
           )}
 
-          {/* Tab: Report Comparison (Observed Numerical Changes Only) */}
-          {activeTab === 'comparison' && (
-            <ReportComparisonView documents={documents} />
-          )}
-
-          {/* Tab: Chronological Timeline (Date -> Document -> Extracted info) */}
-          {activeTab === 'timeline' && (
-            <TimelineView documents={documents} />
-          )}
-
-          {/* Tab 0: Core Medical Document Workflow (Upload -> Extract -> Structure -> Range -> Provenance -> Review) */}
-          {activeTab === 'workflow' && (
-            <CoreWorkflowView
-              onOpenDualPaneWithDoc={(docId) => {
-                setActiveDocId(docId);
-                setActiveTab('dual-pane');
-              }}
-            />
-          )}
-
-          {/* Tab 1: Hero Dual-Pane Viewer */}
-          {activeTab === 'dual-pane' && (
-            documents.length === 0 ? (
-              <div className="card" style={{ padding: '3.5rem 2rem', textAlign: 'center', maxWidth: '640px', margin: '3rem auto' }}>
-                <div style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '12px',
-                  background: '#EFF6FF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 1.25rem auto',
-                  color: '#2563EB',
-                }}>
-                  <FileText size={28} />
-                </div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1E293B', marginBottom: '0.5rem' }}>
-                  No Reports Extracted Yet
-                </h3>
-                <p style={{ color: '#64748B', fontSize: '0.875rem', lineHeight: 1.5, marginBottom: '1.75rem', maxWidth: '480px', margin: '0 auto 1.75rem auto' }}>
-                  Upload a clinical laboratory report or medical document to inspect extracted biomarkers, reference intervals, and exact coordinate provenance.
-                </p>
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-                  <button onClick={() => setIsUploadOpen(true)} className="btn btn-primary">
-                    <UploadCloud size={16} />
-                    Upload Medical Report
-                  </button>
-                  {patients.length === 0 && (
-                    <button
-                      onClick={() => {
-                        setIsIntakeEditing(true);
-                        setActiveTab('patient-intake');
-                      }}
-                      className="btn btn-secondary"
-                    >
-                      <UserPlus size={16} />
-                      Add Patient First
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : activeDocument ? (
-              <div className="dual-pane-grid">
-                {/* Left Pane: Interactive Document Canvas & Bounding Boxes */}
-                <DocumentCanvas
-                  document={activeDocument}
-                  selectedBiomarkerId={selectedBiomarkerId}
-                  onSelectBiomarker={handleSelectBiomarker}
-                  userMode={userMode}
-                />
-
-                {/* Right Pane: Categorized Biomarkers, Reference Ranges & Context */}
-                <BiomarkerPanel
-                  biomarkers={activeDocument.biomarkers}
-                  selectedBiomarkerId={selectedBiomarkerId}
-                  onSelectBiomarker={handleSelectBiomarker}
-                  onOpenVerification={(bm) => setVerifyingBiomarker(bm)}
-                  userMode={userMode}
-                />
-              </div>
-            ) : null
-          )}
-
-          {/* Tab 2: Longitudinal Comparison */}
-          {activeTab === 'longitudinal' && (
-            <LongitudinalComparison
-              documents={documents}
-              conflicts={[]}
-              onSelectBiomarkerForProvenance={(docId, bmId) => {
-                setActiveDocId(docId);
-                setSelectedBiomarkerId(bmId);
-                setActiveTab('dual-pane');
-              }}
-            />
-          )}
-
-          {/* Tab 3: Human-in-the-Loop Verification Queue */}
-          {activeTab === 'hitl-queue' && (
-            <HitlQueueView
-              documents={documents}
-              onOpenVerification={(bm) => setVerifyingBiomarker(bm)}
-              onBatchApproveHighConfidence={handleBatchApprove}
-            />
-          )}
-
-          {/* Tab 4: AI Summary & Clinician Discussion Guide */}
-          {activeTab === 'doctor-prep' && (
-            <DoctorQuestions documents={documents} />
-          )}
-
-          {/* Tab 5: Patient Intake & Profile */}
-          {activeTab === 'patient-intake' && (
+          {/* Tab 2: Patients */}
+          {(activeTab === 'patients' || activeTab === 'patient-intake') && (
             isIntakeEditing ? (
               <PatientIntakeForm
                 initialPatient={activePatient}
@@ -530,6 +620,8 @@ export const App: React.FC = () => {
               <PatientProfileView
                 patient={activePatient}
                 allPatients={patients}
+                documents={managedDocs}
+                labDocuments={documents}
                 onSelectPatient={(patientId) => {
                   const p = patients.find((pt) => pt.id === patientId);
                   if (p) handleSelectPatient(p);
@@ -540,22 +632,52 @@ export const App: React.FC = () => {
                 }}
                 onDeletePatient={handleDeletePatient}
                 onEdit={() => setIsIntakeEditing(true)}
+                onOpenUpload={() => setIsUploadOpen(true)}
+                onViewReport={(repId) => {
+                  setActiveDocId(repId);
+                  setActiveTab('reports');
+                }}
+                onResolveConflict={handleResolveConflict}
+                onOpenAskMedLens={() => setActiveTab('ai-assistant')}
+                saveSuccessNotification={saveSuccessNotification}
               />
             )
           )}
 
-          {/* Tab 6: Medical Document Management & Ingestion Vault */}
-          {activeTab === 'document-manager' && (
-            <DocumentManagerView
+          {/* Tab 3: Reports (Prominent upload, vault, interactive dual-pane canvas, verification, comparison) */}
+          {(activeTab === 'reports' || activeTab === 'document-manager' || activeTab === 'dual-pane' || activeTab === 'workflow' || activeTab === 'hitl-queue' || activeTab === 'comparison' || activeTab === 'timeline') && (
+            <ReportsView
               documents={managedDocs}
+              labDocuments={documents}
               activePatient={activePatient}
-              onUploadDocuments={handleUploadDocuments}
+              onUploadSuccess={handleUploadSuccess}
               onDeleteDocument={handleDeleteDocument}
-              onUpdateDocumentCategory={handleUpdateDocumentCategory}
-              onOpenInDualPane={handleOpenInDualPane}
-              onAddPatient={() => {
-                setIsIntakeEditing(true);
-                setActiveTab('patient-intake');
+              onOpenVerification={(bm) => setVerifyingBiomarker(bm)}
+            />
+          )}
+
+          {/* Tab 4: AI Assistant (Ask MedLens Evidence Q&A + Structured AI-Assisted Summary) */}
+          {(activeTab === 'ai-assistant' || activeTab === 'doctor-prep') && (
+            <AskMedLensView
+              patient={activePatient}
+              documents={managedDocs}
+              labDocuments={documents}
+            />
+          )}
+
+          {/* Tab 5: Settings */}
+          {activeTab === 'settings' && (
+            <SettingsView
+              patients={patients}
+              documents={managedDocs}
+              labDocuments={documents}
+              onResetDatabase={async () => {
+                await clearAllPostgresData();
+                setPatients([]);
+                setActivePatient(null);
+                setManagedDocs([]);
+                setDocuments([]);
+                localStorage.removeItem('medlens_active_patient_id');
               }}
             />
           )}

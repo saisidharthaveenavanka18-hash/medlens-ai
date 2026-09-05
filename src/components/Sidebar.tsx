@@ -32,97 +32,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activePatient,
   onAddPatient,
 }) => {
+  // 5 clear, simplified navigation items
   const navItems = [
     {
       id: 'dashboard' as NavigationTab,
       label: 'Dashboard',
-      icon: <LayoutDashboard size={17} />,
+      icon: <LayoutDashboard size={18} />,
+      isActive: activeTab === 'dashboard',
     },
     {
-      id: 'patient-intake' as NavigationTab,
-      label: 'Patient Overview',
-      icon: <ClipboardList size={17} />,
+      id: 'patients' as NavigationTab,
+      label: 'Patients',
+      icon: <ClipboardList size={18} />,
+      isActive: activeTab === 'patients' || activeTab === 'patient-intake',
     },
     {
-      id: 'document-manager' as NavigationTab,
-      label: 'Documents Vault',
-      icon: <FolderArchive size={17} />,
-    },
-    {
-      id: 'workflow' as NavigationTab,
-      label: 'Core Workflow (Upload & Review)',
-      icon: <Layers size={17} />,
-    },
-    {
-      id: 'dual-pane' as NavigationTab,
-      label: 'Medical Report Viewer',
-      icon: <FileText size={17} />,
-    },
-    {
-      id: 'comparison' as NavigationTab,
-      label: 'Report Comparison',
-      icon: <GitCompare size={17} />,
-    },
-    {
-      id: 'timeline' as NavigationTab,
-      label: 'Chronological Timeline',
-      icon: <Clock size={17} />,
-    },
-    {
-      id: 'hitl-queue' as NavigationTab,
-      label: 'Review & Verify',
-      icon: <CheckCircle2 size={17} />,
+      id: 'reports' as NavigationTab,
+      label: 'Reports',
+      icon: <FileText size={18} />,
       badge: pendingReviewCount > 0 ? pendingReviewCount : undefined,
+      isActive: activeTab === 'reports' || activeTab === 'document-manager' || activeTab === 'dual-pane' || activeTab === 'workflow' || activeTab === 'hitl-queue' || activeTab === 'comparison' || activeTab === 'timeline',
     },
     {
-      id: 'doctor-prep' as NavigationTab,
-      label: 'AI Summary',
-      icon: <Sparkles size={17} />,
+      id: 'ai-assistant' as NavigationTab,
+      label: 'AI Assistant',
+      icon: <Sparkles size={18} />,
+      isActive: activeTab === 'ai-assistant' || activeTab === 'doctor-prep',
+    },
+    {
+      id: 'settings' as NavigationTab,
+      label: 'Settings',
+      icon: <ShieldCheck size={18} />,
+      isActive: activeTab === 'settings',
     },
   ];
 
   return (
-    <aside className="sidebar-container">
+    <aside className="sidebar-container" aria-label="Main Navigation">
       {/* Navigation items */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <div className="sidebar-nav-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
         <div style={{
-          fontSize: '0.675rem',
-          fontWeight: 600,
+          fontSize: '0.6875rem',
+          fontWeight: 700,
           color: 'var(--text-secondary)',
           textTransform: 'uppercase',
-          letterSpacing: '0.05em',
+          letterSpacing: '0.06em',
           padding: '0.2rem 0.5rem 0.5rem 0.5rem',
         }}>
           Navigation
         </div>
 
         {navItems.map((item) => {
-          const isActive = activeTab === item.id;
+          const isActive = item.isActive;
 
           return (
             <button
               key={item.id}
               onClick={() => onSelectTab(item.id)}
+              aria-current={isActive ? 'page' : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '0.55rem 0.75rem',
-                borderRadius: '6px',
+                padding: '0.625rem 0.85rem',
+                borderRadius: '8px',
                 border: '1px solid',
-                borderColor: isActive ? '#BFDBFE' : 'transparent',
-                backgroundColor: isActive ? 'var(--bg-highlight)' : 'transparent',
-                color: isActive ? '#1E40AF' : 'var(--text-main)',
-                fontWeight: isActive ? 600 : 400,
-                fontSize: '0.825rem',
+                borderColor: isActive ? '#BAE6FD' : 'transparent',
+                backgroundColor: isActive ? '#F0F9FF' : 'transparent',
+                color: isActive ? '#0369A1' : '#334155',
+                fontWeight: isActive ? 600 : 500,
+                fontSize: '0.875rem',
                 cursor: 'pointer',
                 textAlign: 'left',
-                transition: 'background-color 0.12s ease',
+                transition: 'all 0.15s ease',
                 outline: 'none',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span style={{ color: isActive ? '#2563EB' : '#64748B', display: 'flex' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <span style={{ color: isActive ? '#0284C7' : '#64748B', display: 'flex' }}>
                   {item.icon}
                 </span>
                 <span className="sidebar-label">{item.label}</span>
@@ -130,12 +117,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               {item.badge !== undefined && (
                 <span style={{
-                  backgroundColor: '#FEE2E2',
+                  backgroundColor: '#FEF2F2',
                   color: '#991B1B',
-                  border: '1px solid #FCA5A5',
-                  fontSize: '0.65rem',
+                  border: '1px solid #FECACA',
+                  fontSize: '0.675rem',
                   fontWeight: 600,
-                  padding: '0.05rem 0.35rem',
+                  padding: '0.1rem 0.45rem',
                   borderRadius: '9999px',
                 }}>
                   {item.badge}

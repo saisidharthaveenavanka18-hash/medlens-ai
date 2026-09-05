@@ -20,7 +20,7 @@ export const SafetyDisclaimerBanner: React.FC<SafetyDisclaimerBannerProps> = ({ 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <ShieldCheck size={16} color="#3B82F6" style={{ flexShrink: 0 }} />
         <span>
-          <strong>Clinical Information Notice:</strong> MedLens organizes and summarizes clinical information. It does not diagnose or replace professional medical judgment.
+          <strong>AI-assisted information.</strong> Verify important details against the original record and consult a qualified healthcare professional for clinical decisions.
         </span>
       </div>
 

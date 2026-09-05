@@ -5,6 +5,7 @@ import {
   Trash2, 
   AlertCircle, 
   Check, 
+  CheckCircle2,
   Save, 
   Database, 
   ShieldCheck, 
@@ -39,6 +40,7 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
   const [name, setName] = useState(initialPatient?.name || '');
   const [age, setAge] = useState(initialPatient?.age !== undefined ? initialPatient.age.toString() : '');
   const [sex, setSex] = useState<PatientRecord['sex']>(initialPatient?.sex || 'Male');
+  const [bloodGroup, setBloodGroup] = useState<string>(initialPatient?.bloodGroup || 'O+');
   const [medicalHistory, setMedicalHistory] = useState(initialPatient?.medicalHistory || '');
   const [additionalNotes, setAdditionalNotes] = useState(initialPatient?.additionalNotes || '');
 
@@ -69,6 +71,7 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Validate form
   const validateForm = (): boolean => {
@@ -179,6 +182,7 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
         name: name.trim(),
         age: parseInt(age, 10),
         sex,
+        bloodGroup: bloodGroup.trim() || undefined,
         symptoms,
         conditions,
         allergies,
@@ -190,10 +194,11 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
         updatedAt: new Date().toISOString(),
       };
 
+      setSaveSuccess(true);
       await onSavePatient(patientRecord);
     } catch (err) {
       console.error('Error saving patient intake form', err);
-      setErrors({ form: 'Failed to persist patient record to PostgreSQL. Please try again.' });
+      setErrors({ form: "We couldn't save this patient record. Please try again." });
     } finally {
       setIsSaving(false);
     }
@@ -240,12 +245,12 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#1E3A8A', margin: 0 }}>
-                Patient Clinical Information Intake
+                Manual Patient &amp; Medical Intake
               </h2>
               <SourceBadge source="USER_PROVIDED" size="sm" />
             </div>
             <p style={{ fontSize: '0.8125rem', color: '#1E40AF', margin: '0.2rem 0 0' }}>
-              Patient-entered intake stored in PostgreSQL with distinct provenance tagging
+              Enter patient and medical details manually to generate the structured patient record
             </p>
           </div>
         </div>
@@ -286,13 +291,31 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
         </div>
       )}
 
-      {/* SECTION 1: Patient Overview & Demographics */}
+      {saveSuccess && (
+        <div style={{
+          background: '#F0FDF4',
+          border: '1.5px solid #86EFAC',
+          borderRadius: '8px',
+          padding: '0.85rem 1.25rem',
+          color: '#15803D',
+          fontSize: '0.9rem',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+        }}>
+          <CheckCircle2 size={18} color="#16A34A" />
+          <span>Patient information saved successfully.</span>
+        </div>
+      )}
+
+      {/* SECTION 1: Patient Information */}
       <div className="card" style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <User size={16} color="#3B82F6" />
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', margin: 0 }}>
-              Patient Demographics &amp; Overview
+              Patient Information
             </h3>
           </div>
           <SourceBadge source="USER_PROVIDED" size="sm" />
@@ -302,11 +325,11 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
           {/* Patient Name */}
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.35rem' }}>
-              Patient Full Name *
+              Patient Full Name * <span style={{ color: '#0284C7', fontWeight: 500 }}>(Required)</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. Patient Full Name"
+              placeholder="e.g. Sarah Jenkins"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -328,11 +351,11 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
           {/* Patient Age */}
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.35rem' }}>
-              Age (Years) *
+              Age (Years) * <span style={{ color: '#0284C7', fontWeight: 500 }}>(Required)</span>
             </label>
             <input
               type="number"
-              placeholder="e.g. 52"
+              placeholder="e.g. 42"
               min="0"
               max="125"
               step="1"
@@ -357,7 +380,7 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
           {/* Patient Biological Sex */}
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.35rem' }}>
-              Biological Sex / Gender *
+              Biological Sex / Gender * <span style={{ color: '#0284C7', fontWeight: 500 }}>(Required)</span>
             </label>
             <select
               value={sex}
@@ -371,10 +394,50 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
               <option value="Prefer not to say">Prefer not to say</option>
             </select>
           </div>
+
+          {/* Blood Group */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.35rem' }}>
+              Blood Group <span style={{ color: '#64748B', fontWeight: 400 }}>(Optional)</span>
+            </label>
+            <select
+              value={bloodGroup}
+              onChange={(e) => setBloodGroup(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+              <option value="Unknown">Unknown / Not Tested</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* SECTION 2: Symptoms & Existing Conditions (Two Columns) */}
+      {/* SECTION 2: Medical Information */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: '0.5rem',
+        padding: '0.5rem 0',
+        borderBottom: '1.5px solid #E2E8F0',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Activity size={18} color="#0D9488" />
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+            Medical Information
+          </h3>
+        </div>
+        <SourceBadge source="USER_PROVIDED" size="sm" />
+      </div>
+
+      {/* Symptoms & Existing Conditions (Two Columns) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
         
         {/* Symptoms Intake */}
@@ -817,7 +880,7 @@ export const PatientIntakeForm: React.FC<PatientIntakeFormProps> = ({
             ) : (
               <>
                 <Save size={15} />
-                <span>Save Patient Profile</span>
+                <span>Save Patient</span>
               </>
             )}
           </button>

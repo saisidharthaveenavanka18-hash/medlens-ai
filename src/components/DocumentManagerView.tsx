@@ -86,7 +86,7 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
         await onUploadDocuments(validFiles, uploadCategory);
       } catch (err) {
         console.error('Upload failed', err);
-        setUploadError('An error occurred during file ingestion.');
+        setUploadError("We couldn't complete the AI analysis. Please try again. Your original document is still available.");
       } finally {
         setIsUploading(false);
       }
@@ -102,18 +102,17 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
     setDragOver(false);
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      await validateAndProcessFiles(e.dataTransfer.files);
+      validateAndProcessFiles(e.dataTransfer.files);
     }
   };
 
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      await validateAndProcessFiles(e.target.files);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      validateAndProcessFiles(e.target.files);
     }
   };
 
@@ -133,30 +132,31 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  // Subtle pastel badges
+  // Explicitly map report lifecycle to 5 standard states:
+  // Uploaded | Processing | Ready | Needs Review | Failed
   const getProcessingStatusBadge = (status: ProcessingStatus) => {
     switch (status) {
       case 'Uploaded':
-        return <span className="badge badge-extracted">Uploaded</span>;
+        return <span className="badge badge-status-uploaded">Uploaded</span>;
       case 'Processing':
-        return <span className="badge badge-pending">Processing</span>;
+        return <span className="badge badge-status-processing">Processing</span>;
       case 'Processed':
-        return <span className="badge badge-normal">Processed</span>;
+        return <span className="badge badge-status-ready">Ready</span>;
       case 'Extraction Failed':
-        return <span className="badge badge-critical">Failed</span>;
+        return <span className="badge badge-status-failed">Failed</span>;
       default:
-        return <span className="badge">{status}</span>;
+        return <span className="badge badge-status-uploaded">{status}</span>;
     }
   };
 
   const getExtractionStatusBadge = (status: ExtractionStatus) => {
     switch (status) {
       case 'Extracted':
-        return <span className="badge badge-extracted">Extracted</span>;
+        return <span className="badge badge-status-ready">Ready</span>;
       case 'Pending':
-        return <span className="badge badge-pending">Pending</span>;
+        return <span className="badge badge-status-processing">Processing</span>;
       case 'Extraction Failed':
-        return <span className="badge badge-critical">Failed</span>;
+        return <span className="badge badge-status-failed">Failed</span>;
       default:
         return <span className="badge">{status}</span>;
     }
@@ -165,11 +165,11 @@ export const DocumentManagerView: React.FC<DocumentManagerViewProps> = ({
   const getVerificationStatusBadge = (status: DocumentVerificationStatus) => {
     switch (status) {
       case 'Verified':
-        return <span className="badge badge-verified"><CheckCircle2 size={11} /> Verified</span>;
+        return <span className="badge badge-status-ready"><CheckCircle2 size={11} /> Ready (Verified)</span>;
       case 'Needs Verification':
-        return <span className="badge badge-pending"><AlertTriangle size={11} /> Needs Verification</span>;
+        return <span className="badge badge-status-needs-review"><AlertTriangle size={11} /> Needs Review</span>;
       case 'Pending':
-        return <span className="badge"><Clock size={11} /> Pending</span>;
+        return <span className="badge badge-status-needs-review"><Clock size={11} /> Needs Review</span>;
       default:
         return <span className="badge">{status}</span>;
     }

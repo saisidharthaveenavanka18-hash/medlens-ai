@@ -60,6 +60,7 @@ export async function getPgDatabase(): Promise<PGlite> {
           name VARCHAR(255) NOT NULL,
           age INT NOT NULL CHECK (age >= 0 AND age <= 125),
           sex VARCHAR(32) NOT NULL,
+          blood_group VARCHAR(16),
           medical_history TEXT,
           additional_notes TEXT,
           source VARCHAR(32) NOT NULL DEFAULT 'USER_PROVIDED',
@@ -153,12 +154,13 @@ export async function savePatientToPostgres(patient: PatientRecord): Promise<voi
 
   // Upsert Patient record
   await pg.query(`
-    INSERT INTO patients (id, name, age, sex, medical_history, additional_notes, source, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    INSERT INTO patients (id, name, age, sex, blood_group, medical_history, additional_notes, source, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       age = EXCLUDED.age,
       sex = EXCLUDED.sex,
+      blood_group = EXCLUDED.blood_group,
       medical_history = EXCLUDED.medical_history,
       additional_notes = EXCLUDED.additional_notes,
       source = EXCLUDED.source,
@@ -168,6 +170,7 @@ export async function savePatientToPostgres(patient: PatientRecord): Promise<voi
     patient.name,
     patient.age,
     patient.sex,
+    patient.bloodGroup || null,
     patient.medicalHistory,
     patient.additionalNotes,
     'USER_PROVIDED',
@@ -248,6 +251,7 @@ export async function getPatientFromPostgres(patientId: string): Promise<Patient
     name: pRow.name,
     age: Number(pRow.age),
     sex: pRow.sex,
+    bloodGroup: pRow.blood_group || undefined,
     medicalHistory: pRow.medical_history || '',
     additionalNotes: pRow.additional_notes || '',
     source: 'USER_PROVIDED',
@@ -425,4 +429,15 @@ export async function updateDocumentStatusInPostgres(
 
   const duration = performance.now() - startTime;
   logQuery(`UPDATE documents SET ${JSON.stringify(updates)} WHERE id = '${docId}'`, [docId], duration, 1);
+}
+
+// Clear all database tables
+export async function clearAllPostgresData(): Promise<void> {
+  const pg = await getPgDatabase();
+  await pg.query('DELETE FROM patient_symptoms');
+  await pg.query('DELETE FROM patient_conditions');
+  await pg.query('DELETE FROM patient_allergies');
+  await pg.query('DELETE FROM patient_medications');
+  await pg.query('DELETE FROM documents');
+  await pg.query('DELETE FROM patients');
 }
